@@ -1,0 +1,35 @@
+name: Fetch Zambia Store Catalogues
+
+on:
+  schedule:
+    - cron: '0 4 * * 3'
+  workflow_dispatch:
+    inputs:
+      store:
+        description: 'Specific store to process (leave empty for all)'
+        required: false
+        default: ''
+
+jobs:
+  fetch-catalogues:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install node-fetch@3 @neondatabase/serverless
+
+      - name: Fetch Zambian catalogues
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TARGET_STORE: ${{ github.event.inputs.store }}
+        run: node scripts/fetch-catalogues.js
