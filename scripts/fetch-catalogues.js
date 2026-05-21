@@ -310,20 +310,20 @@ Output ONLY valid JSON:
     let totalSaved = 0;
 
     for (const storeData of (parsed.stores || [])) {
-      const storeRows = await sql\`SELECT id FROM stores WHERE name = \${storeData.store} LIMIT 1\`;
+      const storeRows = await sql`SELECT id FROM stores WHERE name = ${storeData.store} LIMIT 1\`;
       const storeId = storeRows[0]?.id || null;
 
       for (const p of (storeData.products || [])) {
         if (!p.name || p.price <= 0) continue;
         try {
-          const existing = await sql\`
-            SELECT id FROM catalogue_prices WHERE store_name = \${storeData.store} AND product_name = \${p.name} LIMIT 1
+          const existing = await sql`
+            SELECT id FROM catalogue_prices WHERE store_name = ${storeData.store} AND product_name = ${p.name} LIMIT 1
           \`;
           if (existing.length > 0) continue;
           
-          await sql\`
+          await sql`
             INSERT INTO catalogue_prices (store_id, store_name, product_name, price, is_special, valid_until)
-            VALUES (\${storeId}, \${storeData.store}, \${p.name}, \${p.price}, \${p.isSpecial || false}, NULL)
+            VALUES (${storeId}, ${storeData.store}, ${p.name}, ${p.price}, ${p.isSpecial || false}, NULL)
           \`;
           totalSaved++;
         } catch { /* skip */ }
