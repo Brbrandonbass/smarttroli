@@ -15,6 +15,72 @@ function sanitizeItems(items) {
     .slice(0, 20);
 }
 
+// Extract quantity from search term (e.g. "5l", "2kg", "30s", "5 litre")
+function extractQuantity(itemName) {
+  const text = itemName.toLowerCase().replace(/[^a-z0-9. ]/g, " ").replace(/\s+/g, " ").trim();
+
+  const patterns = [
+    { regex: /\b(\d+(?:\.\d+)?)\s*(litre|liter|litres|liters)\b/, unit: "l" },
+    { regex: /\b(\d+(?:\.\d+)?)\s*(kg|kilogram|kilograms)\b/, unit: "kg" },
+    { regex: /\b(\d+(?:\.\d+)?)\s*(g|gram|grams)\b/, unit: "g" },
+    { regex: /\b(\d+(?:\.\d+)?)\s*(ml|millilitre|milliliter|millilitres|milliliters)\b/, unit: "ml" },
+    { regex: /\b(\d+)\s*s\b/, unit: "s" },
+    { regex: /\b(\d+(?:\.\d+)?)\s*l\b/, unit: "l" },
+    { regex: /\b(\d+(?:\.\d+)?)(kg|g|ml)\b/, unit: null },
+    { regex: /\b(\d+)s\b/, unit: "s" },
+  ];
+
+  for (const { regex, unit } of patterns) {
+    const match = text.match(regex);
+    if (match) {
+      const value = match[1];
+      const resolvedUnit = unit || match[2];
+      return { value, unit: resolvedUnit, raw: match[0].trim() };
+    }
+  }
+  return null;
+}
+
+function productMatchesQuantity(productName, quantity) {
+  const name = productName.toLowerCase();
+  const num = quantity.value.replace(/\.0+$/, "").replace(/^0+(\d)/, "$1");
+  const escaped = num.replace(".", "\\.");
+
+  if (quantity.unit === "l") {
+    return [
+      new RegExp(`\\b${escaped}\\s*l(?:itre|iter|itres|iters)?\\b`, "i"),
+      new RegExp(`\\b${escaped}l\\b`, "i"),
+    ].some(r => r.test(name));
+  }
+  if (quantity.unit === "kg") {
+    return [
+      new RegExp(`\\b${escaped}\\s*kg\\b`, "i"),
+      new RegExp(`\\b${escaped}\\s*kilogram`, "i"),
+      new RegExp(`\\b${escaped}kg\\b`, "i"),
+    ].some(r => r.test(name));
+  }
+  if (quantity.unit === "g") {
+    return [
+      new RegExp(`\\b${escaped}\\s*g(?:ram|rams)?\\b`, "i"),
+      new RegExp(`\\b${escaped}g\\b`, "i"),
+    ].some(r => r.test(name));
+  }
+  if (quantity.unit === "ml") {
+    return [
+      new RegExp(`\\b${escaped}\\s*ml\\b`, "i"),
+      new RegExp(`\\b${escaped}\\s*millilitre`, "i"),
+      new RegExp(`\\b${escaped}ml\\b`, "i"),
+    ].some(r => r.test(name));
+  }
+  if (quantity.unit === "s") {
+    return [
+      new RegExp(`\\b${escaped}\\s*s\\b`, "i"),
+      new RegExp(`\\b${escaped}s\\b`, "i"),
+    ].some(r => r.test(name));
+  }
+  return false;
+}
+
 // Look up prices from Neon database
 async function lookupPrices(itemName) {
   try {
@@ -61,9 +127,19 @@ async function lookupPrices(itemName) {
 
     const toUse = filtered.length > 0 ? filtered : scored;
 
+    // Quantity filter — e.g. "cooking oil 5l" should not return 2L variants
+    const quantity = extractQuantity(itemName);
+    let sizeMatched = toUse;
+    if (quantity) {
+      const exactSize = toUse.filter(row => productMatchesQuantity(row.product_name, quantity));
+      if (exactSize.length > 0) {
+        sizeMatched = exactSize;
+      }
+    }
+
     // Group by store, best match per store
     const byStore = {};
-    for (const row of toUse) {
+    for (const row of sizeMatched) {
       const existing = byStore[row.store_name];
       if (!existing || row.score > existing.score || (row.score === existing.score && row.price < existing.price)) {
         byStore[row.store_name] = row;
