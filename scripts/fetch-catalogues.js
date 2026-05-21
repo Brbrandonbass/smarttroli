@@ -366,8 +366,8 @@ async function main() {
     console.log(`${icon} ${r.store}: ${r.status}${r.products ? ` (${r.products} products)` : ""}${r.reason ? ` — ${r.reason}` : ""}`);
   });
 
-  const succeeded = results.filter(r => r.status === "success").length;
-  console.log(`\nCompleted: ${succeeded}/${results.length} stores`);
+  const totalSucceeded = results.filter(r => r.status === "success").length;
+  console.log(`\nCompleted: ${totalSucceeded}/${results.length} stores`);
   console.log(`Finished: ${new Date().toISOString()}`);
 }
 
