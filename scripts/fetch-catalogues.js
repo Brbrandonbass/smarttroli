@@ -29,6 +29,7 @@ const STORES = [
   {
     name: "Shoprite",
     sources: [
+      "https://www.shoprite.co.zm/specials.html",
       "https://supermarketsandgrocers.shop/zam/shoprite/",
       "https://www.shoprite.co.zm/",
     ],
@@ -37,6 +38,8 @@ const STORES = [
   {
     name: "Pick n Pay",
     sources: [
+      "https://www.picknpayzambia.com/specials",
+      "https://www.picknpayzambia.com/deals-and-promotions",
       "https://supermarketsandgrocers.shop/zam/pick-n-pay/",
       "https://www.picknpayzambia.com/",
     ],
@@ -53,6 +56,7 @@ const STORES = [
   {
     name: "Spar",
     sources: [
+      "https://www.sparzambia.com/specials",
       "https://supermarketsandgrocers.shop/zam/spar/",
     ],
     currency: "K",
@@ -73,16 +77,114 @@ const STORES = [
   },
 ];
 
+// Official domains for web search (when HTML scraping fails)
+const STORE_SEARCH_DOMAINS = {
+  "Choppies": ["choppies.co.zm"],
+  "Shoprite": ["shoprite.co.zm"],
+  "Pick n Pay": ["picknpayzambia.com"],
+  "Game": ["gamestores.co.za", "guzzle.co.za"],
+  "Spar": ["sparzambia.com"],
+  "Woolworths": ["woolworths.co.za"],
+  "Checkers": ["checkers.co.za"],
+};
+
+// ── Per-store anchor prices (Zambian Kwacha) ──────────────────────────────────
+const STORE_ANCHORS = {
+  "Shoprite": {
+    rollerMeal5kg: 158, bread700g: 38, cookingOil2L: 135, sugar2kg: 98,
+    eggs30: 185, chicken2kg: 255, rice2kg: 78, coke2L: 78,
+  },
+  "Pick n Pay": {
+    rollerMeal5kg: 165, bread700g: 42, cookingOil2L: 142, sugar2kg: 105,
+    eggs30: 195, chicken2kg: 270, rice2kg: 85, coke2L: 82,
+  },
+  "Spar": {
+    rollerMeal5kg: 172, bread700g: 45, cookingOil2L: 148, sugar2kg: 110,
+    eggs30: 205, chicken2kg: 285, rice2kg: 90, coke2L: 88,
+  },
+  "Game": {
+    rollerMeal5kg: 155, bread700g: 40, cookingOil2L: 130, sugar2kg: 95,
+    eggs30: 180, chicken2kg: 248, rice2kg: 75, coke2L: 75,
+  },
+};
+
+const STORE_TIERS = {
+  "Shoprite": "cheapest mainstream supermarket in Zambia",
+  "Game": "bulk/value warehouse — lowest unit prices on staples",
+  "Pick n Pay": "competitive mid-low pricing",
+  "Spar": "mid-range neighbourhood supermarket",
+  "Woolworths": "premium quality — higher than Spar",
+  "Checkers": "mid-range supermarket",
+  "Choppies": "budget-friendly discount chain",
+};
+
+const GROCERY_CATEGORIES = [
+  "roller meal", "bread", "eggs", "chicken", "beef", "pork", "fish/kapenta",
+  "cooking oil", "sugar", "rice", "pasta", "beans", "tomatoes", "onions", "potatoes",
+  "milk", "butter", "cheese", "yoghurt", "juice", "Coca-Cola", "Fanta", "water",
+  "soap", "washing powder", "dishwashing liquid", "toothpaste", "shampoo",
+  "nappies", "baby food", "toilet paper", "candles", "matches",
+  "maheu", "tea", "coffee", "flour", "samp", "margarine", "bleach", "spaghetti",
+];
+
+// ── Cookie jar for browser-like requests ──────────────────────────────────────
+const cookieJar = new Map();
+
+function storeCookies(url, headers) {
+  const hostname = new URL(url).hostname;
+  let setCookies = [];
+  if (typeof headers.getSetCookie === "function") {
+    setCookies = headers.getSetCookie();
+  } else if (typeof headers.raw === "function") {
+    setCookies = headers.raw()["set-cookie"] || [];
+  } else {
+    const single = headers.get("set-cookie");
+    if (single) setCookies = [single];
+  }
+  if (!setCookies.length) return;
+  const existing = cookieJar.get(hostname) || {};
+  for (const raw of setCookies) {
+    const pair = raw.split(";")[0];
+    const eq = pair.indexOf("=");
+    if (eq > 0) existing[pair.slice(0, eq).trim()] = pair.slice(eq + 1).trim();
+  }
+  cookieJar.set(hostname, existing);
+}
+
+function getCookieHeader(url) {
+  const cookies = cookieJar.get(new URL(url).hostname);
+  if (!cookies || !Object.keys(cookies).length) return "";
+  return Object.entries(cookies).map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+const BROWSER_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "en-ZM,en-US;q=0.9,en;q=0.8",
+  "Cache-Control": "no-cache",
+  "Pragma": "no-cache",
+  "Sec-Ch-Ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+  "Sec-Ch-Ua-Mobile": "?0",
+  "Sec-Ch-Ua-Platform": '"Windows"',
+  "Sec-Fetch-Dest": "document",
+  "Sec-Fetch-Mode": "navigate",
+  "Sec-Fetch-Site": "none",
+  "Sec-Fetch-User": "?1",
+  "Upgrade-Insecure-Requests": "1",
+};
+
 // ── Fetch HTML ────────────────────────────────────────────────────────────────
 async function fetchHtml(url) {
+  const cookie = getCookieHeader(url);
   const res = await fetch(url, {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-      "Accept-Language": "en-ZM,en;q=0.9",
+      ...BROWSER_HEADERS,
+      ...(cookie ? { Cookie: cookie } : {}),
     },
     timeout: 20000,
+    redirect: "follow",
   });
+  storeCookies(url, res.headers);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const contentType = res.headers.get("content-type") || "";
   if (contentType.includes("pdf")) {
@@ -90,6 +192,35 @@ async function fetchHtml(url) {
     return { type: "pdf", base64: Buffer.from(buffer).toString("base64"), size: buffer.byteLength };
   }
   return { type: "html", content: await res.text() };
+}
+
+// ── Parse Anthropic JSON product responses ────────────────────────────────────
+function getAnthropicText(response) {
+  return (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+}
+
+function parseProductsFromText(text) {
+  const fb = text.indexOf("{");
+  if (fb === -1) return null;
+  let parsed = null;
+  try {
+    const lb = text.lastIndexOf("}");
+    parsed = JSON.parse(text.slice(fb, lb + 1));
+  } catch {
+    try {
+      const partial = text.slice(fb);
+      const lastComma = partial.lastIndexOf("},");
+      if (lastComma > 0) parsed = JSON.parse(partial.slice(0, lastComma + 1) + "]}");
+    } catch { /* ignore */ }
+  }
+  return parsed;
+}
+
+function filterValidProducts(products) {
+  return (products || []).filter(p =>
+    p.name && p.price > 0 && p.price < 100000 &&
+    !p.name.includes(",") && p.name.length < 100
+  );
 }
 
 // ── Extract dates ─────────────────────────────────────────────────────────────
@@ -179,31 +310,9 @@ Output ONLY valid JSON:
 
     if (!res.ok) throw new Error(`Anthropic API ${res.status}`);
     const response = await res.json();
-    const text = (response.content || []).filter(b => b.type === "text").map(b => b.text).join("");
-    const fb = text.indexOf("{");
-    if (fb === -1) return null;
-
-    let parsed = null;
-    // Try full JSON first
-    try {
-      const lb = text.lastIndexOf("}");
-      parsed = JSON.parse(text.slice(fb, lb + 1));
-    } catch {
-      // Fix truncated JSON — find last complete product
-      try {
-        const partial = text.slice(fb);
-        const lastComma = partial.lastIndexOf('},');
-        if (lastComma > 0) {
-          parsed = JSON.parse(partial.slice(0, lastComma + 1) + ']}');
-        }
-      } catch { /* ignore */ }
-    }
-
+    const parsed = parseProductsFromText(getAnthropicText(response));
     if (!parsed) { console.log("  JSON parse failed"); return null; }
-    const products = (parsed.products || []).filter(p =>
-      p.name && p.price > 0 && p.price < 100000 &&
-      !p.name.includes(",") && p.name.length < 100
-    );
+    const products = filterValidProducts(parsed.products);
     console.log(`  Extracted ${products.length} products`);
     return { ...parsed, products };
   } catch (err) {
@@ -293,6 +402,136 @@ async function seedAIPrices() {
   } catch (err) { console.error(`  AI seed failed: ${err.message}`); }
 }
 
+// ── Per-store web search fallback when HTML scraping returns 0 products ───────
+async function fetchStorePricesViaWebSearch(storeName, storeConfig) {
+  console.log(`  Searching web for live ${storeName} Zambia prices...`);
+
+  const domains = STORE_SEARCH_DOMAINS[storeName];
+  const storeSites = (storeConfig?.sources || []).slice(0, 3).join(", ");
+  const tool = {
+    type: "web_search_20250305",
+    name: "web_search",
+    max_uses: 8,
+    user_location: {
+      type: "approximate",
+      city: "Lusaka",
+      region: "Lusaka Province",
+      country: "ZM",
+      timezone: "Africa/Lusaka",
+    },
+    ...(domains?.length ? { allowed_domains: domains } : {}),
+  };
+
+  const prompt = `Search for current ${storeName} Zambia grocery specials and prices this week.
+${storeSites ? `Check official sources: ${storeSites}. ` : ""}Find real current Zambian Kwacha (K) prices for common groceries like mealie meal, roller meal, bread, eggs, chicken, beef, cooking oil, sugar, rice, pasta, milk, Coca-Cola, soap, washing powder, toilet paper, and at least 30 products total.
+Prices must be in Kwacha (K). Use prices from search results — do not invent prices.
+Output ONLY JSON: {"products":[{"name":"product name","price":155.00,"isSpecial":true}]}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 8000,
+        tools: [tool],
+        system: "You are searching for current live grocery prices in Zambia in Kwacha. Output ONLY valid JSON.",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`API ${res.status}: ${errBody.slice(0, 300)}`);
+    }
+
+    const data = await res.json();
+    const parsed = parseProductsFromText(getAnthropicText(data));
+    if (!parsed) {
+      console.log("  Web search JSON parse failed");
+      return null;
+    }
+
+    const products = filterValidProducts(parsed.products);
+    console.log(`  Web search found ${products.length} products for ${storeName}`);
+    return {
+      store: storeName,
+      products,
+      validFrom: parsed.validFrom || null,
+      validUntil: parsed.validUntil || null,
+    };
+  } catch (err) {
+    console.error(`  Web search failed for ${storeName}: ${err.message}`);
+    return null;
+  }
+}
+
+// ── Per-store AI fallback (last resort if web search also fails) ──────────────
+function buildAnchorPrompt(storeName) {
+  const anchors = STORE_ANCHORS[storeName];
+  if (!anchors) return "";
+  return `
+ANCHOR PRICES for ${storeName} (match these closely, vary other items around them):
+- Roller Meal 5kg: K${anchors.rollerMeal5kg}
+- Bread 700g: K${anchors.bread700g}
+- Cooking Oil 2L: K${anchors.cookingOil2L}
+- Sugar 2kg: K${anchors.sugar2kg}
+- Eggs 30s: K${anchors.eggs30}
+- Chicken pieces 2kg: K${anchors.chicken2kg}
+- Rice 2kg: K${anchors.rice2kg}
+- Coca-Cola 2L: K${anchors.coke2L}`;
+}
+
+async function generateStoreAIPrices(storeName) {
+  const tier = STORE_TIERS[storeName] || "Zambian supermarket";
+  const anchorBlock = buildAnchorPrompt(storeName);
+  const categories = GROCERY_CATEGORIES.join(", ");
+
+  console.log(`  Generating AI prices for ${storeName} (${tier})...`);
+  const prompt = `Generate 40+ realistic current Zambian Kwacha (K) grocery prices for ${storeName} Zambia.
+Store positioning: ${tier}.
+${anchorBlock}
+
+Pricing context: Shoprite is cheapest, Game is bulk/value, Pick n Pay is mid-low, Spar is mid-range.
+Include products across these categories: ${categories}.
+Use realistic Zambian brand names and pack sizes. Prices in K, range K10-K5000.
+
+Output ONLY valid JSON:
+{"store":"${storeName}","validFrom":null,"validUntil":null,"products":[{"name":"Roller Meal 5kg","price":158,"isSpecial":false}]}`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-5",
+        max_tokens: 8000,
+        system: "Zambian grocery price expert. Output ONLY valid JSON. Plain ASCII. No markdown.",
+        messages: [{ role: "user", content: prompt }],
+      }),
+    });
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    const parsed = parseProductsFromText(getAnthropicText(data));
+    if (!parsed) return null;
+
+    const products = filterValidProducts(parsed.products);
+    console.log(`  AI generated ${products.length} products for ${storeName}`);
+    return { store: storeName, products, validFrom: null, validUntil: null };
+  } catch (err) {
+    console.error(`  AI generation failed for ${storeName}: ${err.message}`);
+    return null;
+  }
+}
+
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
@@ -345,7 +584,34 @@ async function main() {
     }
 
     if (!success) {
-      results.push({ store: store.name, status: "no-data" });
+      console.log(`  Web scraping returned 0 products — using web search for ${store.name}`);
+      let fallbackData = await fetchStorePricesViaWebSearch(store.name, store);
+      let sourceUrl = `web-search://${store.name.toLowerCase().replace(/\s+/g, "-")}`;
+
+      if (!fallbackData?.products?.length) {
+        console.log(`  Web search returned 0 — using AI fallback for ${store.name}`);
+        fallbackData = await generateStoreAIPrices(store.name);
+        sourceUrl = `ai-generated://${store.name.toLowerCase().replace(/\s+/g, "-")}`;
+      }
+
+      if (fallbackData?.products?.length > 0) {
+        const { saved, count, reason } = await saveToDatabase(
+          store.name,
+          fallbackData.products,
+          fallbackData.validFrom,
+          fallbackData.validUntil,
+          sourceUrl
+        );
+        results.push({
+          store: store.name,
+          status: saved ? "success" : "skipped",
+          products: count,
+          source: sourceUrl,
+          reason: reason || (saved ? sourceUrl.split("://")[0] : undefined),
+        });
+      } else {
+        results.push({ store: store.name, status: "no-data" });
+      }
     }
 
     await new Promise(r => setTimeout(r, 1000));
