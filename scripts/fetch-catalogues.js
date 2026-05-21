@@ -259,81 +259,40 @@ async function saveToDatabase(storeName, products, validFrom, validUntil, source
 }
 
 
-// ── Seed database with accurate AI-generated Zambian prices ──────────────────
-// Used as fallback when web scraping fails
+// ── Seed database with accurate AI-generated Zambian prices ─────────────────
 async function seedAIPrices() {
   console.log("\nSeeding AI-generated Zambian prices...");
-  
-  const prompt = `Generate a comprehensive list of current 2025-2026 Zambian Kwacha grocery prices for these stores: Choppies, Shoprite, Pick n Pay, Game, Spar.
-
-Include 30+ common grocery items per store with realistic Kwacha prices.
-Key reference prices (use these as anchors):
-- Roller Meal 5kg: Choppies K155-175, Shoprite K165-185
-- Bread 700g: K35-55 across stores
-- Cooking Oil 2L: K130-160 across stores  
-- Sugar 2kg: K95-115 across stores
-- Eggs 30s: K180-230 across stores
-- Chicken pieces 2kg: K250-350 across stores
-- Rice 2kg: K75-100 across stores
-- Kapenta 200g: K45-65 across stores
-- Coca-Cola 2L: K75-95 across stores
-- Milk 500ml: K35-50 across stores
-
-Include: dairy, bread, meat, beverages, staples, cleaning products, baby products.
-
-Output ONLY valid JSON:
-{"stores":[{"store":"Choppies","products":[{"name":"Roller Meal 5kg","price":155,"isSpecial":false},{"name":"Albany Bread 700g","price":42,"isSpecial":false}]},{"store":"Shoprite","products":[{"name":"Roller Meal 5kg","price":165,"isSpecial":false}]}]}`;
-
+  const prompt = `Generate current 2025-2026 Zambian Kwacha grocery prices for: Choppies, Shoprite, Pick n Pay, Game, Spar. Include 30+ items per store. Key prices: Roller Meal 5kg K155-175, Bread 700g K35-55, Cooking Oil 2L K130-160, Sugar 2kg K95-115, Eggs 30s K180-230, Chicken 2kg K250-350, Rice 2kg K75-100, Coke 2L K75-95. Output ONLY valid JSON: {"stores":[{"store":"Choppies","products":[{"name":"Roller Meal 5kg","price":155,"isSpecial":false}]}]}`;
   try {
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5",
-        max_tokens: 8000,
-        system: "You are a Zambian grocery price expert. Output ONLY valid JSON. Plain ASCII.",
-        messages: [{ role: "user", content: prompt }],
-      }),
+      headers: { "Content-Type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: "claude-sonnet-4-5", max_tokens: 8000, system: "Zambian grocery price expert. Output ONLY valid JSON. Plain ASCII.", messages: [{ role: "user", content: prompt }] }),
     });
-
     if (!res.ok) throw new Error(`API ${res.status}`);
     const data = await res.json();
     const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
     const fb = text.indexOf("{"); const lb = text.lastIndexOf("}");
     if (fb === -1) return;
-
     const parsed = JSON.parse(text.slice(fb, lb + 1));
     let totalSaved = 0;
-
     for (const storeData of (parsed.stores || [])) {
-      const storeRows = await sql`SELECT id FROM stores WHERE name = ${storeData.store} LIMIT 1\`;
+      const storeRows = await sql`SELECT id FROM stores WHERE name = ${storeData.store} LIMIT 1`;
       const storeId = storeRows[0]?.id || null;
-
       for (const p of (storeData.products || [])) {
         if (!p.name || p.price <= 0) continue;
         try {
-          const existing = await sql`
-            SELECT id FROM catalogue_prices WHERE store_name = ${storeData.store} AND product_name = ${p.name} LIMIT 1
-          \`;
+          const existing = await sql`SELECT id FROM catalogue_prices WHERE store_name = ${storeData.store} AND product_name = ${p.name} LIMIT 1`;
           if (existing.length > 0) continue;
-          
-          await sql`
-            INSERT INTO catalogue_prices (store_id, store_name, product_name, price, is_special, valid_until)
-            VALUES (${storeId}, ${storeData.store}, ${p.name}, ${p.price}, ${p.isSpecial || false}, NULL)
-          \`;
+          await sql`INSERT INTO catalogue_prices (store_id, store_name, product_name, price, is_special, valid_until) VALUES (${storeId}, ${storeData.store}, ${p.name}, ${p.price}, ${p.isSpecial || false}, NULL)`;
           totalSaved++;
         } catch { /* skip */ }
       }
     }
     console.log(`  ✓ Seeded ${totalSaved} AI price entries`);
-  } catch (err) {
-    console.error(`  AI seed failed: ${err.message}`);
-  }
+  } catch (err) { console.error(`  AI seed failed: ${err.message}`); }
 }
+
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
