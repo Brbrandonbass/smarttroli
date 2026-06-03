@@ -1,0 +1,37 @@
+name: Process Zambia Catalogue PDFs
+
+on:
+  push:
+    paths:
+      - 'catalogues/zambia/*.pdf'
+      - 'catalogues/zambia/*.PDF'
+  workflow_dispatch:
+    inputs:
+      filename:
+        description: 'PDF filename in catalogues/zambia/ to process (leave empty for all)'
+        required: false
+        default: ''
+
+jobs:
+  process-pdfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install node-fetch@3 @neondatabase/serverless
+
+      - name: Process catalogue PDFs
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TARGET_FILE: ${{ github.event.inputs.filename }}
+        run: node scripts/process-pdfs.js
