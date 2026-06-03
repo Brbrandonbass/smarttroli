@@ -79,7 +79,7 @@ async function extractFromPDF(pdfBuffer, storeName, filename) {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-5",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 8000,
         system: "You are extracting Zambian grocery prices from a store catalogue PDF. Extract EVERY individual product and its Kwacha price. Skip bundle deals. Output ONLY valid JSON. Plain ASCII only.",
         messages: [{

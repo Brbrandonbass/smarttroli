@@ -3,11 +3,11 @@ name: Process Zambia Catalogue PDFs
 on:
   push:
     paths:
-      - 'catalogues/zambia/*.pdf'
-      - 'catalogues/zambia/*.PDF'
+      - 'catalogues/zambia/**.pdf'
+      - 'catalogues/zambia/**.PDF'
   workflow_dispatch:
     inputs:
-      filename:
+      target_file:
         description: 'PDF filename in catalogues/zambia/ to process (leave empty for all)'
         required: false
         default: ''
@@ -33,5 +33,5 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TARGET_FILE: ${{ github.event.inputs.filename }}
+          TARGET_FILE: ${{ github.event.inputs.target_file }}
         run: node scripts/process-pdfs.js
