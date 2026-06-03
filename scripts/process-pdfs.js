@@ -4,9 +4,10 @@
 // Or manually: node scripts/process-pdfs.js
 
 import { readFileSync, readdirSync, existsSync } from "fs";
-import { join, basename } from "path";
+import { join } from "path";
 import fetch from "node-fetch";
 import { neon } from "@neondatabase/serverless";
+import { PDFDocument } from "pdf-lib";
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -57,41 +58,26 @@ function detectDates(filename) {
   return { validFrom: null, validUntil: null };
 }
 
-// ── Extract prices from PDF using Claude ──────────────────────────────────────
-async function extractFromPDF(pdfBuffer, storeName, filename) {
-  console.log(`  Sending to Claude for extraction...`);
-  const base64 = pdfBuffer.toString("base64");
-  const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(1);
-  console.log(`  PDF size: ${sizeMB}MB`);
+const CHUNK_SIZE_BYTES = 8 * 1024 * 1024;
+const MODEL = "claude-sonnet-4-20250514";
+const MAX_TOKENS = 4000;
 
-  // Process in chunks if PDF is large
-  const MAX_SIZE_MB = 20;
-  if (pdfBuffer.length > MAX_SIZE_MB * 1024 * 1024) {
-    console.log(`  PDF is large — Claude will extract what it can from the first section`);
+async function splitPDF(buffer, pagesPerChunk = 10) {
+  const srcDoc = await PDFDocument.load(buffer);
+  const total = srcDoc.getPageCount();
+  const chunks = [];
+  for (let i = 0; i < total; i += pagesPerChunk) {
+    const doc = await PDFDocument.create();
+    const end = Math.min(i + pagesPerChunk, total);
+    const pages = await doc.copyPages(srcDoc, [...Array(end - i).keys()].map(x => x + i));
+    pages.forEach(p => doc.addPage(p));
+    chunks.push({ buffer: Buffer.from(await doc.save()), startPage: i + 1, endPage: end });
   }
+  return chunks;
+}
 
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 8000,
-        system: "You are extracting Zambian grocery prices from a store catalogue PDF. Extract EVERY individual product and its Kwacha price. Skip bundle deals. Output ONLY valid JSON. Plain ASCII only.",
-        messages: [{
-          role: "user",
-          content: [
-            {
-              type: "document",
-              source: { type: "base64", media_type: "application/pdf", data: base64 },
-            },
-            {
-              type: "text",
-              text: `Extract ALL individual products and their Zambian Kwacha (K) prices from this ${storeName} Zambia catalogue.
+function buildExtractionPrompt(storeName, pageHint = "") {
+  return `Extract ALL individual products and their Zambian Kwacha (K) prices from this ${storeName} Zambia catalogue${pageHint}.
 
 Rules:
 - Extract EVERY product with a clear price
@@ -103,45 +89,120 @@ Rules:
 Output ONLY this JSON:
 {"store":"${storeName}","validFrom":null,"validUntil":null,"products":[{"name":"IBC Nakonde Rice 5kg","price":162.99,"isSpecial":true},{"name":"Zamanita Cooking Oil 5L","price":208.99,"isSpecial":true},{"name":"Roller Meal 10kg","price":285.99,"isSpecial":true}]}
 
-Extract as many products as possible.`,
-            },
-          ],
-        }],
-      }),
-    });
+Extract as many products as possible.`;
+}
 
-    if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
-    const data = await res.json();
-    const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+function parseClaudeProducts(text) {
+  const fb = text.indexOf("{");
+  if (fb === -1) throw new Error("No JSON in response");
 
-    // Parse JSON — handle truncation
-    const fb = text.indexOf("{");
-    if (fb === -1) throw new Error("No JSON in response");
-
-    let parsed = null;
+  let parsed = null;
+  try {
+    const lb = text.lastIndexOf("}");
+    parsed = JSON.parse(text.slice(fb, lb + 1));
+  } catch {
     try {
-      const lb = text.lastIndexOf("}");
-      parsed = JSON.parse(text.slice(fb, lb + 1));
-    } catch {
-      // Fix truncated JSON
-      try {
-        const partial = text.slice(fb);
-        const lastComma = partial.lastIndexOf("},");
-        if (lastComma > 0) {
-          parsed = JSON.parse(partial.slice(0, lastComma + 1) + "]}");
-        }
-      } catch {
-        throw new Error("Could not parse JSON response");
+      const partial = text.slice(fb);
+      const lastComma = partial.lastIndexOf("},");
+      if (lastComma > 0) {
+        parsed = JSON.parse(partial.slice(0, lastComma + 1) + "]}");
       }
+    } catch {
+      throw new Error("Could not parse JSON response");
+    }
+  }
+
+  const products = (parsed.products || []).filter(p =>
+    p.name && p.price > 0 && p.price < 100000 &&
+    !p.name.includes(",") && p.name.length < 150
+  );
+  return { products, validFrom: parsed.validFrom, validUntil: parsed.validUntil };
+}
+
+async function extractChunkWithClaude(pdfBuffer, storeName, pageHint = "") {
+  const base64 = pdfBuffer.toString("base64");
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: MAX_TOKENS,
+      system: "You are extracting Zambian grocery prices from a store catalogue PDF. Extract EVERY individual product and its Kwacha price. Skip bundle deals. Output ONLY valid JSON. Plain ASCII only.",
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: base64 },
+          },
+          { type: "text", text: buildExtractionPrompt(storeName, pageHint) },
+        ],
+      }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const text = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("");
+  return parseClaudeProducts(text);
+}
+
+function dedupeProducts(products) {
+  const seen = new Map();
+  for (const p of products) {
+    const key = p.name.toLowerCase().trim();
+    if (!seen.has(key)) seen.set(key, p);
+  }
+  return [...seen.values()];
+}
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// ── Extract prices from PDF using Claude ──────────────────────────────────────
+async function extractFromPDF(pdfBuffer, storeName) {
+  const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(1);
+  console.log(`  PDF size: ${sizeMB}MB`);
+
+  try {
+    if (pdfBuffer.length <= CHUNK_SIZE_BYTES) {
+      console.log(`  Sending to Claude for extraction...`);
+      const { products, validFrom, validUntil } = await extractChunkWithClaude(pdfBuffer, storeName);
+      console.log(`  ✓ Extracted ${products.length} products`);
+      return { products, validFrom, validUntil };
     }
 
-    const products = (parsed.products || []).filter(p =>
-      p.name && p.price > 0 && p.price < 100000 &&
-      !p.name.includes(",") && p.name.length < 150
-    );
+    console.log(`  PDF exceeds 8MB — splitting into 10-page chunks...`);
+    const chunks = await splitPDF(pdfBuffer, 10);
+    console.log(`  Split into ${chunks.length} chunk(s)`);
 
-    console.log(`  ✓ Extracted ${products.length} products`);
-    return { products, validFrom: parsed.validFrom, validUntil: parsed.validUntil };
+    const allProducts = [];
+    let validFrom = null;
+    let validUntil = null;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const { buffer, startPage, endPage } = chunks[i];
+      const chunkMB = (buffer.length / 1024 / 1024).toFixed(1);
+      console.log(`  Chunk ${i + 1}/${chunks.length}: pages ${startPage}-${endPage} (${chunkMB}MB)`);
+
+      const pageHint = ` (pages ${startPage}-${endPage})`;
+      const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
+        buffer, storeName, pageHint
+      );
+      console.log(`  ✓ Chunk ${i + 1}: ${products.length} products`);
+      allProducts.push(...products);
+      if (vf) validFrom = validFrom || vf;
+      if (vu) validUntil = validUntil || vu;
+
+      if (i < chunks.length - 1) await sleep(1000);
+    }
+
+    const products = dedupeProducts(allProducts);
+    console.log(`  ✓ Merged ${products.length} unique products from ${chunks.length} chunks`);
+    return { products, validFrom, validUntil };
 
   } catch (err) {
     console.error(`  Extraction failed: ${err.message}`);

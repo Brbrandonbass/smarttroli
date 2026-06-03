@@ -27,7 +27,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install node-fetch@3 @neondatabase/serverless
+        run: npm install node-fetch@3 @neondatabase/serverless pdf-lib
 
       - name: Process catalogue PDFs
         env:
