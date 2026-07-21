@@ -5,7 +5,6 @@
 
 import { neon } from "@neondatabase/serverless";
 import fetch from "node-fetch";
-import { PDFDocument } from "pdf-lib";
 import { execSync } from "child_process";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -160,51 +159,83 @@ function ensurePdfDir() {
   if (!existsSync(PDF_DIR)) mkdirSync(PDF_DIR, { recursive: true });
 }
 
-// Catalogue images served as JPGs (e.g. Pick n Pay) instead of a single PDF.
-function findCatalogueImageLinks(html, baseUrl) {
-  const imgRegex = /(?:href|src)\s*=\s*["']([^"']+\.jpe?g)["']/gi;
-  const seen = new Set();
-  const links = [];
+// Finds every .pdf reference in a blob of text — absolute URLs anywhere
+// (inline <script> JSON, JSON-LD, plain markup) plus href/src attributes
+// (anchors, <link>, autoindex directory listings) resolved against baseUrl.
+function findPdfUrlsInText(text, baseUrl) {
+  const urls = new Set();
+
+  const absoluteRegex = /https?:\/\/[^\s"'<>\\]+\.pdf/gi;
   let m;
-  while ((m = imgRegex.exec(html))) {
-    let url;
+  while ((m = absoluteRegex.exec(text))) urls.add(m[0]);
+
+  const attrRegex = /(?:href|src)\s*=\s*["']([^"']+\.pdf)["']/gi;
+  while ((m = attrRegex.exec(text))) {
     try {
-      url = new URL(m[1], baseUrl).href;
+      urls.add(new URL(m[1], baseUrl).href);
     } catch {
-      continue; // malformed URL — skip
+      // malformed URL — skip
     }
-    if (!url.includes("wp-content/uploads")) continue;
-    if (/-\d+x\d+\.jpe?g$/i.test(url)) continue; // skip WordPress-generated thumbnail sizes
-    if (seen.has(url)) continue;
-    seen.add(url);
-    links.push(url);
   }
-  return links;
+
+  return [...urls];
 }
 
-// Sorts catalogue page images by a trailing page number (e.g. "...-01.jpg"),
-// falling back to 0 (keeps original order) when no number is present.
-function pageNumberOf(url) {
-  const m = url.match(/(\d+)\.jpe?g(?:[?#].*)?$/i);
-  return m ? parseInt(m[1], 10) : 0;
+// Known real Pick n Pay path shape: /wp-content/uploads/YYYY/MM/[title].pdf.
+// Candidates matching it are tried before any other stray .pdf found on the page.
+function pdfCandidateScore(url) {
+  return /\/wp-content\/uploads\/\d{4}\/\d{2}\/[^/]+\.pdf$/i.test(url) ? 0 : 1;
 }
 
-// Combines JPEG page images into a single PDF, one image per page. Images
-// that fail to embed (corrupt download, unexpected format) are skipped rather
-// than failing the whole catalogue; returns null if none could be embedded.
-async function combineJpegsToPdf(jpegBuffers) {
-  const pdfDoc = await PDFDocument.create();
-  for (const bytes of jpegBuffers) {
+// current month + previous month, in case directory listing is enabled on
+// the uploads folder (a common misconfiguration that exposes real filenames).
+function uploadDirCandidates(origin) {
+  const now = new Date();
+  const y1 = now.getFullYear();
+  const m1 = now.getMonth() + 1;
+  let y2 = y1;
+  let m2 = m1 - 1;
+  if (m2 === 0) {
+    m2 = 12;
+    y2 = y1 - 1;
+  }
+  const pad = (n) => String(n).padStart(2, "0");
+  return [
+    `${origin}/wp-content/uploads/${y1}/${pad(m1)}/`,
+    `${origin}/wp-content/uploads/${y2}/${pad(m2)}/`,
+  ];
+}
+
+function isPdfBuffer(buffer) {
+  return !!buffer && buffer.length >= 4 && buffer.slice(0, 4).toString("latin1") === "%PDF";
+}
+
+// Probes the uploads directory listing for current/previous month, then
+// scans the promotions page itself (anchors, <link>, inline script/JSON-LD),
+// returning candidate PDF URLs ranked by how well they match the known path shape.
+async function discoverPnpPdfUrls(pageUrl, html) {
+  const candidates = [];
+  const seen = new Set();
+  const addCandidate = (url) => {
+    if (!seen.has(url)) {
+      seen.add(url);
+      candidates.push(url);
+    }
+  };
+
+  const origin = new URL(pageUrl).origin;
+  for (const dirUrl of uploadDirCandidates(origin)) {
     try {
-      const image = await pdfDoc.embedJpg(bytes);
-      const page = pdfDoc.addPage([image.width, image.height]);
-      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
-    } catch (err) {
-      console.log(`  ✗ Skipping unembeddable image: ${err.message}`);
+      const dirHtml = await fetchText(dirUrl);
+      for (const url of findPdfUrlsInText(dirHtml, dirUrl)) addCandidate(url);
+    } catch {
+      // directory listing disabled or missing — expected in most cases
     }
   }
-  if (pdfDoc.getPageCount() === 0) return null;
-  return Buffer.from(await pdfDoc.save());
+
+  for (const url of findPdfUrlsInText(html, pageUrl)) addCandidate(url);
+
+  return candidates.sort((a, b) => pdfCandidateScore(a) - pdfCandidateScore(b));
 }
 
 // ── Git commit + push ───────────────────────────────────────────────────────
@@ -337,9 +368,12 @@ async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclud
   }
 }
 
-// Pick n Pay publishes each catalogue page as a separate JPG rather than a
-// single PDF — download every page image and combine them into one PDF so
-// process-pdfs.js can handle it exactly like the other stores.
+// Pick n Pay's promotions page renders the actual catalogue via JavaScript —
+// the server-side HTML only carries stale placeholder images. Probe for the
+// real PDF instead: try the current/previous month's uploads directory
+// listing, then scan the page's anchors/<link>/inline script/JSON-LD for any
+// .pdf reference, and validate each candidate by its "%PDF" magic bytes
+// before trusting it.
 async function checkPickNPay() {
   const storeName = "Pick n Pay";
   const pageUrl = "https://www.picknpayzambia.com/promotions/";
@@ -353,50 +387,49 @@ async function checkPickNPay() {
 
   try {
     const html = await fetchText(pageUrl);
-    const imageUrls = findCatalogueImageLinks(html, pageUrl).sort(
-      (a, b) => pageNumberOf(a) - pageNumberOf(b)
-    );
-    if (imageUrls.length === 0) {
-      console.log("  ⏭️  No catalogue images found");
-      await logMonitor(storeName, pageUrl, "skipped", "no catalogue images found");
-      return { store: storeName, result: "skipped", detail: "no catalogue images found" };
-    }
-    console.log(`  Found ${imageUrls.length} catalogue image(s)`);
+    // Raw HTML snapshot for debugging what the scraper actually sees.
+    await logMonitor(storeName, pageUrl, "html_snapshot", html.slice(0, 3000));
 
-    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(imageUrls[0], html);
+    const candidates = await discoverPnpPdfUrls(pageUrl, html);
+    console.log(`  Found ${candidates.length} candidate PDF URL(s)`);
 
-    const jpegBuffers = [];
-    for (const url of imageUrls) {
-      const { ok, status, buffer } = await fetchBuffer(url);
-      if (!ok) {
-        console.log(`  ✗ HTTP ${status} fetching ${url} — skipping this page`);
-        continue;
+    let pdfUrl = null;
+    let buffer = null;
+    for (const url of candidates) {
+      const res = await fetchBuffer(url);
+      if (res.ok && isPdfBuffer(res.buffer)) {
+        pdfUrl = url;
+        buffer = res.buffer;
+        break;
       }
-      jpegBuffers.push(buffer);
+      console.log(`  ✗ Not a usable PDF: ${url} (${res.ok ? "not a PDF" : `HTTP ${res.status}`})`);
     }
 
-    const pdfBuffer = jpegBuffers.length ? await combineJpegsToPdf(jpegBuffers) : null;
-    if (!pdfBuffer) {
-      console.log("  ✗ Could not build a PDF from any catalogue image");
-      await logMonitor(storeName, pageUrl, "error", "no catalogue images could be downloaded/embedded");
-      return { store: storeName, result: "error", detail: "no catalogue images could be downloaded/embedded" };
+    if (!pdfUrl) {
+      console.log("  ⏭️  No valid catalogue PDF found — page likely renders it via JavaScript");
+      await logMonitor(
+        storeName,
+        pageUrl,
+        "skipped",
+        `no valid PDF found among ${candidates.length} candidate(s) — see html_snapshot log`
+      );
+      return { store: storeName, result: "skipped", detail: "no valid PDF found" };
     }
 
+    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(pdfUrl, html);
     const startTok = dateToFilenameToken(validFrom, false);
     const endTok = dateToFilenameToken(validUntil, true);
     const filename = `PicknPay_${startTok}_${endTok}.pdf`;
     ensurePdfDir();
-    writeFileSync(join(PDF_DIR, filename), pdfBuffer);
-    console.log(
-      `  📥 Saved ${filename} (${jpegBuffers.length} page(s))${usedFallbackDates ? " (dates not found — used fallback range)" : ""}`
-    );
+    writeFileSync(join(PDF_DIR, filename), buffer);
+    console.log(`  📥 Saved ${filename}${usedFallbackDates ? " (dates not found — used fallback range)" : ""}`);
 
     commitAndPushCatalogue(storeName, `${startTok}_${endTok}`);
     await logMonitor(
       storeName,
-      pageUrl,
+      pdfUrl,
       "new_catalogue",
-      `saved ${filename} (${jpegBuffers.length} page(s) combined)${usedFallbackDates ? " (fallback dates)" : ""}`
+      `saved ${filename}${usedFallbackDates ? " (fallback dates)" : ""}`
     );
     return { store: storeName, result: "new_catalogue", detail: filename };
   } catch (err) {
