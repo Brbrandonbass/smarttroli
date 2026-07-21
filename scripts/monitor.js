@@ -228,12 +228,19 @@ function commitAndPushCatalogue(storeName, label) {
     return false;
   }
   try {
-    run("git add catalogues/zambia/");
-    run(
-      `git -c user.email="bot@smarttroli.app" -c user.name="SmartTroli Bot" commit -m "Auto: ${storeName} catalogue ${label}"`
-    );
     const remote = `https://${SMARTTROLI_GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git`;
-    run(`git push "${remote}" HEAD:main`);
+    run(`git remote set-url origin "${remote}"`);
+    run(`git config user.email "monitor@smarttroli.app"`);
+    run(`git config user.name "SmartTroli Monitor"`);
+
+    run("git add catalogues/zambia/");
+    run(`git commit -m "Auto: ${storeName} catalogue ${label}"`);
+    // actions/checkout persists an `http.https://github.com/.extraheader` auth
+    // header for the default GITHUB_TOKEN (github-actions[bot]). That header
+    // applies to any github.com request regardless of the origin URL set
+    // above, so it overrides our embedded token and the push 403s as the
+    // bot. Clear it for this push only so the origin URL's token is used.
+    run(`git -c http.https://github.com/.extraheader= push origin HEAD:main`);
     console.log(`  ✓ Committed and pushed ${storeName} catalogue`);
     return true;
   } catch (err) {
