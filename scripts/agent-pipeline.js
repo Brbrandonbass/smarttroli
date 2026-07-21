@@ -432,11 +432,21 @@ export async function extractWithLoop(pdfBuffer, storeName, catalogueId, { store
   for (let i = 0; i < pdfChunks.length; i++) {
     const { buffer, startPage, endPage } = pdfChunks[i];
     const chunkIndex = i;
-    const existing = await getChunkRow(sql, catalogueId, chunkIndex);
+    let existing = await getChunkRow(sql, catalogueId, chunkIndex);
 
     if (existing?.status === "done") {
-      console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage} — already done (${existing.product_count} products)`);
+      console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage} — skipped, already done (${existing.product_count} products)`);
       continue;
+    }
+
+    if (existing?.status === "failed") {
+      console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage} — previously failed after ${existing.retries} retries, resetting to pending for retry`);
+      await upsertChunkRow(sql, catalogueId, chunkIndex, startPage, endPage, {
+        status: "pending",
+        product_count: 0,
+        retries: 0,
+      });
+      existing = null;
     }
 
     let retries = existing?.retries ?? 0;
