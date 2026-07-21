@@ -99,10 +99,12 @@ async function lookupPrices(itemName) {
     for (const keyword of keywords.slice(0, 3)) {
       const pattern = `%${keyword}%`;
       const rows = await sql`
-        SELECT store_name, product_name, price, is_special, valid_until
-        FROM catalogue_prices
-        WHERE product_name ILIKE ${pattern}
-        ORDER BY price ASC
+        SELECT cp.store_name, cp.product_name, cp.price, cp.is_special, cp.valid_until
+        FROM catalogue_prices cp
+        JOIN catalogues c ON c.id = cp.catalogue_id
+        WHERE cp.product_name ILIKE ${pattern}
+          AND c.source_url LIKE 'github://catalogues/zambia/%'
+        ORDER BY cp.price ASC
         LIMIT 50
       `;
       allResults.push(...rows);

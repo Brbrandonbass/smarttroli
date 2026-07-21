@@ -68,13 +68,6 @@ const STORES = [
     ],
     currency: "K",
   },
-  {
-    name: "Checkers",
-    sources: [
-      "https://supermarketsandgrocers.shop/zam/checkers/",
-    ],
-    currency: "K",
-  },
 ];
 
 // Official domains for web search (when HTML scraping fails)
@@ -85,7 +78,6 @@ const STORE_SEARCH_DOMAINS = {
   "Game": ["gamestores.co.za", "guzzle.co.za"],
   "Spar": ["sparzambia.com"],
   "Woolworths": ["woolworths.co.za"],
-  "Checkers": ["checkers.co.za"],
 };
 
 // ── Per-store anchor prices (Zambian Kwacha) ──────────────────────────────────
@@ -114,7 +106,6 @@ const STORE_TIERS = {
   "Pick n Pay": "competitive mid-low pricing",
   "Spar": "mid-range neighbourhood supermarket",
   "Woolworths": "premium quality — higher than Spar",
-  "Checkers": "mid-range supermarket",
   "Choppies": "budget-friendly discount chain",
 };
 

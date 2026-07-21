@@ -38,3 +38,8 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           TARGET_FILE: ${{ github.event.inputs.target_file }}
         run: node scripts/process-pdfs.js
+
+      - name: Data quality check
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: node scripts/quality-check.js
