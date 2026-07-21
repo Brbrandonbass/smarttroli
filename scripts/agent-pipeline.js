@@ -5,9 +5,12 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { PDFDocument } from "pdf-lib";
-import sharp from "sharp";
 import fetch from "node-fetch";
 import { neon } from "@neondatabase/serverless";
+import { execSync } from "child_process";
+import { writeFileSync, readFileSync, readdirSync, unlinkSync } from "fs";
+import { join } from "path";
+import { randomUUID } from "crypto";
 
 export const MODEL = "claude-sonnet-4-20250514";
 export const MCP_BETA = "mcp-client-2025-04-04";
@@ -233,15 +236,34 @@ export function parseClaudeProducts(text) {
   return { products, validFrom: parsed.validFrom, validUntil: parsed.validUntil };
 }
 
-// Rasterize each page of a (small, few-page) chunk PDF to a compressed JPEG —
-// image content blocks are far smaller than raw PDF binary for image-heavy catalogues.
-async function rasterizeChunkToJpegs(chunkBuffer, pageCount, dpi = 150) {
-  const images = [];
-  for (let page = 0; page < pageCount; page++) {
-    const jpeg = await sharp(chunkBuffer, { density: dpi, page }).jpeg({ quality: 80 }).toBuffer();
-    images.push(jpeg);
+const TMP_DIR = "/tmp";
+
+// Rasterize each page of a (small, few-page) chunk PDF to a compressed JPEG via
+// poppler's pdftoppm — image content blocks are far smaller than raw PDF binary
+// for image-heavy catalogues.
+async function rasterizeChunkToJpegs(chunkBuffer, dpi = 120) {
+  const id = randomUUID();
+  const pdfPath = join(TMP_DIR, `chunk_${id}.pdf`);
+  const outPrefix = join(TMP_DIR, `chunk_${id}_page`);
+  const outNamePrefix = `chunk_${id}_page`;
+
+  writeFileSync(pdfPath, chunkBuffer);
+
+  try {
+    execSync(`pdftoppm -jpeg -r ${dpi} "${pdfPath}" "${outPrefix}"`);
+
+    const outFiles = readdirSync(TMP_DIR)
+      .filter((f) => f.startsWith(outNamePrefix))
+      .sort();
+
+    const images = outFiles.map((f) => readFileSync(join(TMP_DIR, f)));
+
+    for (const f of outFiles) unlinkSync(join(TMP_DIR, f));
+
+    return images;
+  } finally {
+    try { unlinkSync(pdfPath); } catch { /* already removed */ }
   }
-  return images;
 }
 
 async function extractChunkWithClaude(pageImages, storeName, pageHint = "") {
@@ -351,7 +373,7 @@ async function extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueI
     console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage}`);
 
     try {
-      const pageImages = await rasterizeChunkToJpegs(buffer, endPage - startPage + 1);
+      const pageImages = await rasterizeChunkToJpegs(buffer);
       const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
         pageImages,
         storeName,
@@ -431,7 +453,7 @@ export async function extractWithLoop(pdfBuffer, storeName, catalogueId, { store
         const pageHint = ` (pages ${startPage}-${endPage})`;
         console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage}${retries ? ` (retry ${retries})` : ""}`);
 
-        const pageImages = await rasterizeChunkToJpegs(buffer, endPage - startPage + 1);
+        const pageImages = await rasterizeChunkToJpegs(buffer);
         const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
           pageImages,
           storeName,
