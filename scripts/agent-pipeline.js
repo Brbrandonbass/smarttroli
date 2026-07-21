@@ -16,7 +16,7 @@ export const RETRY_BACKOFF_MS = [2000, 4000, 8000];
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const DATABASE_URL = process.env.DATABASE_URL;
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const SMARTTROLI_GITHUB_TOKEN = process.env.SMARTTROLI_GITHUB_TOKEN;
 const GITHUB_REPOSITORY = process.env.GITHUB_REPOSITORY || "Brbrandonbass/smarttroli";
 
 export const STORE_MONITOR_URLS = [
@@ -59,11 +59,11 @@ export async function createMcpClients() {
     clients.push({ client: neonClient, prefix: "neon", label: "Neon" });
   }
 
-  if (GITHUB_TOKEN) {
+  if (SMARTTROLI_GITHUB_TOKEN) {
     const ghTransport = new StdioClientTransport({
       command: "npx",
       args: ["-y", "@modelcontextprotocol/server-github"],
-      env: { ...process.env, GITHUB_PERSONAL_ACCESS_TOKEN: GITHUB_TOKEN },
+      env: { ...process.env, GITHUB_PERSONAL_ACCESS_TOKEN: SMARTTROLI_GITHUB_TOKEN },
     });
     const ghClient = new Client({ name: "smarttroli-github", version: "1.0.0" });
     await ghClient.connect(ghTransport);
@@ -481,8 +481,8 @@ async function getLatestCatalogueValidUntil(sql, storeName) {
 }
 
 async function triggerProcessPdfsWorkflow(targetFile = "") {
-  if (!GITHUB_TOKEN) {
-    console.log("  GITHUB_TOKEN not set — skipping workflow dispatch");
+  if (!SMARTTROLI_GITHUB_TOKEN) {
+    console.log("  SMARTTROLI_GITHUB_TOKEN not set — skipping workflow dispatch");
     return false;
   }
   const [owner, repo] = GITHUB_REPOSITORY.split("/");
@@ -491,7 +491,7 @@ async function triggerProcessPdfsWorkflow(targetFile = "") {
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${GITHUB_TOKEN}`,
+        Authorization: `Bearer ${SMARTTROLI_GITHUB_TOKEN}`,
         Accept: "application/vnd.github+json",
         "Content-Type": "application/json",
       },
@@ -507,7 +507,7 @@ export async function monitorAndFetch() {
   let mcpClients = null;
 
   try {
-    if (GITHUB_TOKEN) mcpClients = await createMcpClients();
+    if (SMARTTROLI_GITHUB_TOKEN) mcpClients = await createMcpClients();
 
     for (const store of STORE_MONITOR_URLS) {
       console.log(`\n🔍 Monitoring ${store.name}: ${store.url}`);
