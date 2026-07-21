@@ -93,7 +93,18 @@ export default function ReportPriceModal({ productName, defaultStore, onClose, o
           <button
             onClick={onClose}
             aria-label="Close"
-            style={{ background: "none", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "26px", cursor: "pointer", lineHeight: 1, padding: "0 0 0 12px" }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.4)",
+              fontSize: "22px",
+              cursor: "pointer",
+              lineHeight: 1,
+              padding: "10px",
+              margin: "-10px -10px 0 0",
+              minWidth: "44px",
+              minHeight: "44px",
+            }}
           >
             ×
           </button>
