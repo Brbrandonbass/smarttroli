@@ -81,17 +81,60 @@ function productMatchesQuantity(productName, quantity) {
   return false;
 }
 
+const STOP_WORDS = new Set(["the","and","or","in","at","of","a","an","for","with","to","is","it"]);
+
+function extractKeywords(itemName) {
+  return itemName.toLowerCase()
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(" ")
+    .filter(w => w.length > 2 && !STOP_WORDS.has(w));
+}
+
+// Community-submitted prices for this item, only those not yet expired.
+// Kept as separate offers (not deduped per store) since multiple community
+// reports for the same store/product at different branches are all useful.
+async function lookupCommunityPrices(sql, itemName, keywords) {
+  if (keywords.length === 0) return [];
+  try {
+    const pattern = `%${keywords[0]}%`;
+    const rows = await sql`
+      SELECT id, store_name, product_name, price, unit, location, verified, upvotes, downvotes, created_at
+      FROM community_prices
+      WHERE product_name ILIKE ${pattern} AND valid_until > NOW()
+      ORDER BY created_at DESC
+      LIMIT 20
+    `;
+    return rows
+      .filter(r => keywords.some(w => r.product_name.toLowerCase().includes(w)))
+      .map(r => ({
+        store: r.store_name,
+        price: `K${Number(r.price).toFixed(2)}`,
+        note: r.product_name + (r.unit ? ` (${r.unit})` : ""),
+        onSpecial: false,
+        source: "Community reported",
+        fromDatabase: true,
+        community: {
+          id: r.id,
+          location: r.location,
+          upvotes: r.upvotes,
+          downvotes: r.downvotes,
+          verified: r.verified,
+          createdAt: r.created_at,
+        },
+      }));
+  } catch (err) {
+    console.error("Community price lookup failed:", err.message);
+    return [];
+  }
+}
+
 // Look up prices from Neon database
 async function lookupPrices(itemName) {
   try {
     if (!process.env.DATABASE_URL) return [];
     const sql = neon(process.env.DATABASE_URL);
 
-    const stopWords = new Set(["the","and","or","in","at","of","a","an","for","with","to","is","it"]);
-    const keywords = itemName.toLowerCase()
-      .replace(/[^a-z0-9 ]/g, " ")
-      .split(" ")
-      .filter(w => w.length > 2 && !stopWords.has(w));
+    const keywords = extractKeywords(itemName);
 
     if (keywords.length === 0) return [];
 
@@ -110,52 +153,67 @@ async function lookupPrices(itemName) {
       allResults.push(...rows);
     }
 
-    if (allResults.length === 0) return [];
+    // Note: no early-return on zero catalogue results here — community prices
+    // (checked further below) still need to run even when nothing was found
+    // in catalogue_prices, since that's exactly when they're most useful.
+    let catalogueOffers = [];
+    if (allResults.length > 0) {
+      // Score by keyword matches
+      const scored = allResults.map(row => {
+        const productLower = row.product_name.toLowerCase();
+        const score = keywords.filter(w => productLower.includes(w)).length;
+        return { ...row, score };
+      }).filter(r => r.score > 0);
 
-    // Score by keyword matches
-    const scored = allResults.map(row => {
-      const productLower = row.product_name.toLowerCase();
-      const score = keywords.filter(w => productLower.includes(w)).length;
-      return { ...row, score };
-    }).filter(r => r.score > 0);
+      // Filter bundles
+      const filtered = scored.filter(row => {
+        const name = row.product_name;
+        const isBundleLong = name.includes(" & ") && name.length > 60;
+        const isTooLong = name.length > 100;
+        return !isBundleLong && !isTooLong;
+      });
 
-    // Filter bundles
-    const filtered = scored.filter(row => {
-      const name = row.product_name;
-      const isBundleLong = name.includes(" & ") && name.length > 60;
-      const isTooLong = name.length > 100;
-      return !isBundleLong && !isTooLong;
+      const toUse = filtered.length > 0 ? filtered : scored;
+
+      // Quantity filter — e.g. "cooking oil 5l" should not return 2L variants
+      const quantity = extractQuantity(itemName);
+      let sizeMatched = toUse;
+      if (quantity) {
+        const exactSize = toUse.filter(row => productMatchesQuantity(row.product_name, quantity));
+        if (exactSize.length > 0) {
+          sizeMatched = exactSize;
+        }
+      }
+
+      // Group by store, best match per store
+      const byStore = {};
+      for (const row of sizeMatched) {
+        const existing = byStore[row.store_name];
+        if (!existing || row.score > existing.score || (row.score === existing.score && row.price < existing.price)) {
+          byStore[row.store_name] = row;
+        }
+      }
+
+      catalogueOffers = Object.values(byStore).map(r => ({
+        store: r.store_name,
+        price: `K${Number(r.price).toFixed(2)}`,
+        note: r.product_name,
+        onSpecial: r.is_special,
+        source: "Weekly catalogue",
+        fromDatabase: true,
+      }));
+    }
+
+    const communityOffers = await lookupCommunityPrices(sql, itemName, keywords);
+
+    // Merge and sort ascending by price — catalogue and community offers both
+    // stay visible (community reports are never deduped into a store's single
+    // catalogue slot), labeled by their own `source`.
+    return [...catalogueOffers, ...communityOffers].sort((a, b) => {
+      const pa = parseFloat(String(a.price).replace("K", "")) || Infinity;
+      const pb = parseFloat(String(b.price).replace("K", "")) || Infinity;
+      return pa - pb;
     });
-
-    const toUse = filtered.length > 0 ? filtered : scored;
-
-    // Quantity filter — e.g. "cooking oil 5l" should not return 2L variants
-    const quantity = extractQuantity(itemName);
-    let sizeMatched = toUse;
-    if (quantity) {
-      const exactSize = toUse.filter(row => productMatchesQuantity(row.product_name, quantity));
-      if (exactSize.length > 0) {
-        sizeMatched = exactSize;
-      }
-    }
-
-    // Group by store, best match per store
-    const byStore = {};
-    for (const row of sizeMatched) {
-      const existing = byStore[row.store_name];
-      if (!existing || row.score > existing.score || (row.score === existing.score && row.price < existing.price)) {
-        byStore[row.store_name] = row;
-      }
-    }
-
-    return Object.values(byStore).map(r => ({
-      store: r.store_name,
-      price: `K${Number(r.price).toFixed(2)}`,
-      note: r.product_name,
-      onSpecial: r.is_special,
-      source: "Weekly catalogue",
-      fromDatabase: true,
-    }));
   } catch (err) {
     console.error("DB lookup failed:", err.message);
     return [];
