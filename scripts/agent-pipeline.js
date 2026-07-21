@@ -12,7 +12,7 @@ import { writeFileSync, readFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
 
-export const MODEL = "claude-sonnet-4-20250514";
+export const MODEL = "claude-sonnet-4-6";
 export const MCP_BETA = "mcp-client-2025-04-04";
 export const MIN_PRODUCTS_PROCESSED = 20;
 export const MAX_CHUNK_RETRIES = 3;
