@@ -5,6 +5,7 @@
 
 import { neon } from "@neondatabase/serverless";
 import fetch from "node-fetch";
+import { PDFDocument } from "pdf-lib";
 import { execSync } from "child_process";
 import { writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -70,6 +71,22 @@ function extractDateRange(text) {
   };
 }
 
+// Matches a single date like "01-March-2023" — used when a filename/page only
+// carries a start date rather than a full range (e.g. Pick n Pay's image names).
+function extractSingleDate(text) {
+  const pattern =
+    /(\d{1,2})[\s-]*(?:st|nd|rd|th)?[\s-]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[\s-]*(\d{4})?/i;
+  const m = text.match(pattern);
+  if (!m) return null;
+
+  const [, day, monRaw, yearRaw] = m;
+  const mon = monRaw.toLowerCase().slice(0, 3);
+  if (!MONTH_NUM[mon]) return null;
+
+  const year = yearRaw || String(new Date().getFullYear());
+  return `${year}-${MONTH_NUM[mon]}-${day.padStart(2, "0")}`;
+}
+
 // Used when no date range can be found in the filename or page text — assumes
 // a typical 2-week catalogue starting today.
 function fallbackDateRange() {
@@ -78,6 +95,24 @@ function fallbackDateRange() {
   end.setDate(end.getDate() + 13);
   const iso = (d) => d.toISOString().slice(0, 10);
   return { validFrom: iso(now), validUntil: iso(end) };
+}
+
+// Tries a full date range first, then a single start date (+13 days), then
+// falls back to a 14-day window from today. Tries each text candidate in order.
+function resolveDateRange(...texts) {
+  for (const text of texts) {
+    const range = extractDateRange(text);
+    if (range.validFrom) return { ...range, usedFallback: false };
+  }
+  for (const text of texts) {
+    const start = extractSingleDate(text);
+    if (start) {
+      const end = new Date(start);
+      end.setDate(end.getDate() + 13);
+      return { validFrom: start, validUntil: end.toISOString().slice(0, 10), usedFallback: false };
+    }
+  }
+  return { ...fallbackDateRange(), usedFallback: true };
 }
 
 function dateToFilenameToken(iso, includeYear) {
@@ -123,6 +158,53 @@ function findPdfLinks(html, baseUrl, mustInclude) {
 
 function ensurePdfDir() {
   if (!existsSync(PDF_DIR)) mkdirSync(PDF_DIR, { recursive: true });
+}
+
+// Catalogue images served as JPGs (e.g. Pick n Pay) instead of a single PDF.
+function findCatalogueImageLinks(html, baseUrl) {
+  const imgRegex = /(?:href|src)\s*=\s*["']([^"']+\.jpe?g)["']/gi;
+  const seen = new Set();
+  const links = [];
+  let m;
+  while ((m = imgRegex.exec(html))) {
+    let url;
+    try {
+      url = new URL(m[1], baseUrl).href;
+    } catch {
+      continue; // malformed URL — skip
+    }
+    if (!url.includes("wp-content/uploads")) continue;
+    if (/-\d+x\d+\.jpe?g$/i.test(url)) continue; // skip WordPress-generated thumbnail sizes
+    if (seen.has(url)) continue;
+    seen.add(url);
+    links.push(url);
+  }
+  return links;
+}
+
+// Sorts catalogue page images by a trailing page number (e.g. "...-01.jpg"),
+// falling back to 0 (keeps original order) when no number is present.
+function pageNumberOf(url) {
+  const m = url.match(/(\d+)\.jpe?g(?:[?#].*)?$/i);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+// Combines JPEG page images into a single PDF, one image per page. Images
+// that fail to embed (corrupt download, unexpected format) are skipped rather
+// than failing the whole catalogue; returns null if none could be embedded.
+async function combineJpegsToPdf(jpegBuffers) {
+  const pdfDoc = await PDFDocument.create();
+  for (const bytes of jpegBuffers) {
+    try {
+      const image = await pdfDoc.embedJpg(bytes);
+      const page = pdfDoc.addPage([image.width, image.height]);
+      page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
+    } catch (err) {
+      console.log(`  ✗ Skipping unembeddable image: ${err.message}`);
+    }
+  }
+  if (pdfDoc.getPageCount() === 0) return null;
+  return Buffer.from(await pdfDoc.save());
 }
 
 // ── Git commit + push ───────────────────────────────────────────────────────
@@ -217,13 +299,7 @@ async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclud
     }
 
     const pdfUrl = links[0];
-    let { validFrom, validUntil } = extractDateRange(pdfUrl);
-    if (!validFrom) ({ validFrom, validUntil } = extractDateRange(html));
-    let usedFallbackDates = false;
-    if (!validFrom) {
-      ({ validFrom, validUntil } = fallbackDateRange());
-      usedFallbackDates = true;
-    }
+    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(pdfUrl, html);
 
     const { ok, status, buffer } = await fetchBuffer(pdfUrl);
     if (!ok) {
@@ -254,13 +330,73 @@ async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclud
   }
 }
 
-function checkPickNPay() {
-  return checkPdfFromPage({
-    storeName: "Pick n Pay",
-    pageUrl: "https://www.picknpayzambia.com/promotions/",
-    filenamePrefix: "PicknPay",
-    mustInclude: "wp-content/uploads",
-  });
+// Pick n Pay publishes each catalogue page as a separate JPG rather than a
+// single PDF — download every page image and combine them into one PDF so
+// process-pdfs.js can handle it exactly like the other stores.
+async function checkPickNPay() {
+  const storeName = "Pick n Pay";
+  const pageUrl = "https://www.picknpayzambia.com/promotions/";
+  console.log(`\n🔍 Checking ${storeName}: ${pageUrl}`);
+
+  if (await hasKnownCatalogue(storeName)) {
+    console.log("  ⏭️  Already have a known catalogue — skipping");
+    await logMonitor(storeName, pageUrl, "skipped", "valid_until already on file");
+    return { store: storeName, result: "skipped" };
+  }
+
+  try {
+    const html = await fetchText(pageUrl);
+    const imageUrls = findCatalogueImageLinks(html, pageUrl).sort(
+      (a, b) => pageNumberOf(a) - pageNumberOf(b)
+    );
+    if (imageUrls.length === 0) {
+      console.log("  ⏭️  No catalogue images found");
+      await logMonitor(storeName, pageUrl, "skipped", "no catalogue images found");
+      return { store: storeName, result: "skipped", detail: "no catalogue images found" };
+    }
+    console.log(`  Found ${imageUrls.length} catalogue image(s)`);
+
+    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(imageUrls[0], html);
+
+    const jpegBuffers = [];
+    for (const url of imageUrls) {
+      const { ok, status, buffer } = await fetchBuffer(url);
+      if (!ok) {
+        console.log(`  ✗ HTTP ${status} fetching ${url} — skipping this page`);
+        continue;
+      }
+      jpegBuffers.push(buffer);
+    }
+
+    const pdfBuffer = jpegBuffers.length ? await combineJpegsToPdf(jpegBuffers) : null;
+    if (!pdfBuffer) {
+      console.log("  ✗ Could not build a PDF from any catalogue image");
+      await logMonitor(storeName, pageUrl, "error", "no catalogue images could be downloaded/embedded");
+      return { store: storeName, result: "error", detail: "no catalogue images could be downloaded/embedded" };
+    }
+
+    const startTok = dateToFilenameToken(validFrom, false);
+    const endTok = dateToFilenameToken(validUntil, true);
+    const filename = `PicknPay_${startTok}_${endTok}.pdf`;
+    ensurePdfDir();
+    writeFileSync(join(PDF_DIR, filename), pdfBuffer);
+    console.log(
+      `  📥 Saved ${filename} (${jpegBuffers.length} page(s))${usedFallbackDates ? " (dates not found — used fallback range)" : ""}`
+    );
+
+    commitAndPushCatalogue(storeName, `${startTok}_${endTok}`);
+    await logMonitor(
+      storeName,
+      pageUrl,
+      "new_catalogue",
+      `saved ${filename} (${jpegBuffers.length} page(s) combined)${usedFallbackDates ? " (fallback dates)" : ""}`
+    );
+    return { store: storeName, result: "new_catalogue", detail: filename };
+  } catch (err) {
+    console.error(`  ✗ ${err.message}`);
+    await logMonitor(storeName, pageUrl, "error", err.message);
+    return { store: storeName, result: "error", detail: err.message };
+  }
 }
 
 function checkShoprite() {
