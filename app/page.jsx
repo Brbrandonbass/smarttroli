@@ -2,6 +2,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import ReportPriceModal from "./components/ReportPriceModal";
+import LivePricesFeed from "./components/LivePricesFeed";
+
+function timeAgo(dateStr) {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 function parsePrice(price) {
   if (price === null || price === undefined) return null;
@@ -74,6 +87,44 @@ export default function SmartTroli() {
   const [expandedItem, setExpandedItem] = useState(null);
   const [phase, setPhase] = useState("input");
   const [savingsPhrase] = useState(SAVINGS_PHRASES[Math.floor(Math.random() * SAVINGS_PHRASES.length)]);
+  const [reportItem, setReportItem] = useState(null); // { productName, defaultStore } | null
+  const [votedIds, setVotedIds] = useState(new Set());
+  const [voteOverrides, setVoteOverrides] = useState({}); // { [communityId]: { upvotes, downvotes, verified } }
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+  const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("smarttroli_voted_prices") || "[]");
+      setVotedIds(new Set(stored));
+    } catch { /* ignore malformed/blocked localStorage */ }
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  async function voteOnCommunityPrice(communityId, vote) {
+    if (votedIds.has(communityId)) return;
+    try {
+      const res = await fetch("/api/community/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: communityId, vote }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      setVoteOverrides(prev => ({ ...prev, [communityId]: data.price }));
+      const next = new Set(votedIds);
+      next.add(communityId);
+      setVotedIds(next);
+      try {
+        localStorage.setItem("smarttroli_voted_prices", JSON.stringify([...next]));
+      } catch { /* ignore */ }
+    } catch { /* network error — silently no-op, button stays available to retry */ }
+  }
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -248,6 +299,8 @@ export default function SmartTroli() {
           </div>
 
           <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px 16px 80px" }}>
+
+            <LivePricesFeed refreshKey={feedRefreshKey} />
 
             {/* ── LOCATION ── */}
             <div style={{
@@ -531,6 +584,26 @@ export default function SmartTroli() {
                       )}
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReportItem({ productName: item.name, defaultStore: item.cheapest?.store });
+                        }}
+                        style={{
+                          background: "rgba(59,130,246,0.12)",
+                          border: "1px solid rgba(59,130,246,0.35)",
+                          borderRadius: "20px",
+                          padding: "5px 10px",
+                          fontSize: "11px",
+                          color: "#3B82F6",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        📍 Report
+                      </button>
                       {item.cheapest && (
                         <div style={{ background: "rgba(255,215,0,0.1)", border: "1.5px solid rgba(255,215,0,0.3)", borderRadius: "10px", padding: "6px 12px", fontSize: "16px", fontWeight: "800", color: "#FFD700" }}>
                           K{item.cheapest.price.toFixed(2)}
@@ -544,11 +617,14 @@ export default function SmartTroli() {
                       {(item.offers || []).slice().sort((a, b) => (parsePrice(a.price) || 9999) - (parsePrice(b.price) || 9999)).map((o, j) => {
                         const p = parsePrice(o.price);
                         const isBest = o.store === item.cheapest?.store;
-                        const storeCol = STORES.find(s => o.store?.includes(s.name))?.color || "#FF6B00";
+                        const isCommunity = !!o.community;
+                        const storeCol = isCommunity ? "#3B82F6" : (STORES.find(s => o.store?.includes(s.name))?.color || "#FF6B00");
                         const allPrices = item.offers.map(x => parsePrice(x.price)).filter(Boolean);
                         const minP = Math.min(...allPrices);
                         const maxP = Math.max(...allPrices);
                         const barPct = maxP === minP ? 80 : Math.round(((maxP - p) / (maxP - minP)) * 60 + 20);
+                        const communityLive = isCommunity ? { ...o.community, ...voteOverrides[o.community.id] } : null;
+                        const hasVoted = isCommunity && votedIds.has(o.community.id);
                         return (
                           <div key={j} style={{ padding: "6px 0", borderBottom: j < item.offers.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "2px" }}>
@@ -568,6 +644,40 @@ export default function SmartTroli() {
                             {o.note && o.note !== item.name && (
                               <div style={{ fontSize: "10px", color: "rgba(245,240,232,0.3)", paddingLeft: "108px" }}>{o.note}</div>
                             )}
+                            <div style={{ paddingLeft: "108px", display: "flex", alignItems: "center", gap: "7px", marginTop: "3px", flexWrap: "wrap" }}>
+                              <span style={{
+                                fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "10px",
+                                background: isCommunity ? "rgba(59,130,246,0.15)" : "rgba(255,107,0,0.12)",
+                                border: `1px solid ${isCommunity ? "rgba(59,130,246,0.4)" : "rgba(255,107,0,0.3)"}`,
+                                color: isCommunity ? "#3B82F6" : "#FF6B00",
+                              }}>
+                                {o.source || "Weekly catalogue"}
+                              </span>
+                              {isCommunity && (
+                                <>
+                                  <span style={{ fontSize: "10px", color: "rgba(245,240,232,0.35)" }}>
+                                    Reported {timeAgo(communityLive.createdAt)}
+                                  </span>
+                                  {communityLive.verified && (
+                                    <span style={{ fontSize: "10px", color: "#3B82F6", fontWeight: 700 }}>✓ verified</span>
+                                  )}
+                                  <button
+                                    onClick={() => voteOnCommunityPrice(o.community.id, "up")}
+                                    disabled={hasVoted}
+                                    style={{ background: "none", border: "none", cursor: hasVoted ? "default" : "pointer", fontSize: "12px", opacity: hasVoted ? 0.4 : 1, padding: "0 2px" }}
+                                  >
+                                    👍 {communityLive.upvotes}
+                                  </button>
+                                  <button
+                                    onClick={() => voteOnCommunityPrice(o.community.id, "down")}
+                                    disabled={hasVoted}
+                                    style={{ background: "none", border: "none", cursor: hasVoted ? "default" : "pointer", fontSize: "12px", opacity: hasVoted ? 0.4 : 1, padding: "0 2px" }}
+                                  >
+                                    👎 {communityLive.downvotes}
+                                  </button>
+                                </>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -591,6 +701,30 @@ export default function SmartTroli() {
               🗺️ Get Directions
             </button>
           </div>
+        </div>
+      )}
+
+      {reportItem && (
+        <ReportPriceModal
+          productName={reportItem.productName}
+          defaultStore={reportItem.defaultStore}
+          onClose={() => setReportItem(null)}
+          onSubmitted={() => {
+            setReportItem(null);
+            setToast("✓ Price reported — thanks for helping the community!");
+            setFeedRefreshKey(k => k + 1);
+          }}
+        />
+      )}
+
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
+          background: "#132615", border: "1px solid rgba(59,130,246,0.4)", borderRadius: "12px",
+          padding: "12px 18px", color: "#F5F0E8", fontSize: "13px", fontWeight: 600,
+          boxShadow: "0 4px 24px rgba(0,0,0,0.4)", zIndex: 1100, maxWidth: "90vw", textAlign: "center",
+        }}>
+          {toast}
         </div>
       )}
 
