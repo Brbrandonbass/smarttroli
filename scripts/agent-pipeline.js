@@ -183,8 +183,9 @@ export async function agentLoop(userMessage, { system, mcpClients } = {}) {
 // ── PDF splitting + Claude extraction helpers ─────────────────────────────────
 
 export async function splitPDF(buffer, pagesPerChunk = 10) {
-  const srcDoc = await PDFDocument.load(buffer);
+  const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const total = srcDoc.getPageCount();
+  console.log(`  PDF has ${total} page(s) — chunking at ${pagesPerChunk} pages/chunk`);
   const chunks = [];
   for (let i = 0; i < total; i += pagesPerChunk) {
     const doc = await PDFDocument.create();
@@ -319,10 +320,75 @@ async function countCatalogueProducts(sql, catalogueId) {
 
 // ── Chunked extraction with DB tracking + retries ─────────────────────────────
 
+function isUndefinedTableError(err) {
+  return err?.code === "42P01" || /relation ".*" does not exist/i.test(err?.message || "");
+}
+
+// Fallback used when extraction_chunks is missing (e.g. migration not yet run):
+// same page-based splitPDF() chunks, but no per-chunk DB tracking/resume — just
+// extract each chunk with Claude and save products directly.
+async function extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueId, { storeId, validFrom, validUntil } = {}) {
+  console.warn("  ⚠ extraction_chunks table not found — falling back to untracked single-pass extraction");
+
+  const pdfChunks = await splitPDF(pdfBuffer, 10);
+  console.log(`  Split into ${pdfChunks.length} chunk(s)`);
+
+  let extractedValidFrom = validFrom;
+  let extractedValidUntil = validUntil;
+
+  for (let i = 0; i < pdfChunks.length; i++) {
+    const { buffer, startPage, endPage } = pdfChunks[i];
+    console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage}`);
+
+    try {
+      const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
+        buffer,
+        storeName,
+        ` (pages ${startPage}-${endPage})`
+      );
+      if (vf) extractedValidFrom = extractedValidFrom || vf;
+      if (vu) extractedValidUntil = extractedValidUntil || vu;
+
+      const saved = await saveChunkProducts(
+        sql, catalogueId, storeId, storeName, products, extractedValidFrom, extractedValidUntil
+      );
+      console.log(`  ✓ Chunk ${i + 1}: ${saved} products saved`);
+    } catch (err) {
+      console.error(`  ✗ Chunk ${i + 1} failed: ${err.message}`);
+    }
+
+    if (i < pdfChunks.length - 1) await sleep(1000);
+  }
+
+  const totalProducts = await countCatalogueProducts(sql, catalogueId);
+  const ready = totalProducts >= MIN_PRODUCTS_PROCESSED;
+
+  await sql`
+    UPDATE catalogues SET processed = ${ready}, raw_text = ${`${totalProducts} products${ready ? "" : " (pending)"}`}
+    WHERE id = ${catalogueId}
+  `;
+
+  const allRows = await sql`
+    SELECT product_name, price, is_special FROM catalogue_prices WHERE catalogue_id = ${catalogueId}
+  `;
+  const products = dedupeProducts(
+    allRows.map((r) => ({ name: r.product_name, price: Number(r.price), isSpecial: r.is_special }))
+  );
+
+  return { products, validFrom: extractedValidFrom, validUntil: extractedValidUntil, totalProducts, processed: ready };
+}
+
 export async function extractWithLoop(pdfBuffer, storeName, catalogueId, { storeId, validFrom, validUntil } = {}) {
   const sql = getSql();
   const sizeMB = (pdfBuffer.length / 1024 / 1024).toFixed(1);
   console.log(`  PDF size: ${sizeMB}MB — agentic chunk extraction`);
+
+  try {
+    await sql`SELECT 1 FROM extraction_chunks LIMIT 1`;
+  } catch (err) {
+    if (!isUndefinedTableError(err)) throw err;
+    return extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueId, { storeId, validFrom, validUntil });
+  }
 
   const pdfChunks = await splitPDF(pdfBuffer, 10);
   console.log(`  Split into ${pdfChunks.length} chunk(s)`);
