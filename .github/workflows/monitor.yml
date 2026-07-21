@@ -20,7 +20,7 @@ jobs:
           node-version: '22'
 
       - name: Install dependencies
-        run: npm install @anthropic-ai/sdk @modelcontextprotocol/sdk @neondatabase/serverless pdf-lib node-fetch
+        run: npm install @anthropic-ai/sdk @modelcontextprotocol/sdk @neondatabase/serverless pdf-lib sharp node-fetch
 
       - name: Run catalogue monitor
         env:

@@ -5,6 +5,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { PDFDocument } from "pdf-lib";
+import sharp from "sharp";
 import fetch from "node-fetch";
 import { neon } from "@neondatabase/serverless";
 
@@ -182,7 +183,7 @@ export async function agentLoop(userMessage, { system, mcpClients } = {}) {
 
 // ── PDF splitting + Claude extraction helpers ─────────────────────────────────
 
-export async function splitPDF(buffer, pagesPerChunk = 10) {
+export async function splitPDF(buffer, pagesPerChunk = 2) {
   const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
   const total = srcDoc.getPageCount();
   console.log(`  PDF has ${total} page(s) — chunking at ${pagesPerChunk} pages/chunk`);
@@ -232,9 +233,24 @@ export function parseClaudeProducts(text) {
   return { products, validFrom: parsed.validFrom, validUntil: parsed.validUntil };
 }
 
-async function extractChunkWithClaude(pdfBuffer, storeName, pageHint = "") {
+// Rasterize each page of a (small, few-page) chunk PDF to a compressed JPEG —
+// image content blocks are far smaller than raw PDF binary for image-heavy catalogues.
+async function rasterizeChunkToJpegs(chunkBuffer, pageCount, dpi = 150) {
+  const images = [];
+  for (let page = 0; page < pageCount; page++) {
+    const jpeg = await sharp(chunkBuffer, { density: dpi, page }).jpeg({ quality: 80 }).toBuffer();
+    images.push(jpeg);
+  }
+  return images;
+}
+
+async function extractChunkWithClaude(pageImages, storeName, pageHint = "") {
   const anthropic = getAnthropic();
-  const base64 = pdfBuffer.toString("base64");
+
+  const imageBlocks = pageImages.map((jpeg) => ({
+    type: "image",
+    source: { type: "base64", media_type: "image/jpeg", data: jpeg.toString("base64") },
+  }));
 
   const response = await anthropic.messages.create({
     model: MODEL,
@@ -244,13 +260,7 @@ async function extractChunkWithClaude(pdfBuffer, storeName, pageHint = "") {
     messages: [
       {
         role: "user",
-        content: [
-          {
-            type: "document",
-            source: { type: "base64", media_type: "application/pdf", data: base64 },
-          },
-          { type: "text", text: buildExtractionPrompt(storeName, pageHint) },
-        ],
+        content: [...imageBlocks, { type: "text", text: buildExtractionPrompt(storeName, pageHint) }],
       },
     ],
   });
@@ -330,7 +340,7 @@ function isUndefinedTableError(err) {
 async function extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueId, { storeId, validFrom, validUntil } = {}) {
   console.warn("  ⚠ extraction_chunks table not found — falling back to untracked single-pass extraction");
 
-  const pdfChunks = await splitPDF(pdfBuffer, 10);
+  const pdfChunks = await splitPDF(pdfBuffer, 2);
   console.log(`  Split into ${pdfChunks.length} chunk(s)`);
 
   let extractedValidFrom = validFrom;
@@ -341,8 +351,9 @@ async function extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueI
     console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage}`);
 
     try {
+      const pageImages = await rasterizeChunkToJpegs(buffer, endPage - startPage + 1);
       const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
-        buffer,
+        pageImages,
         storeName,
         ` (pages ${startPage}-${endPage})`
       );
@@ -390,7 +401,7 @@ export async function extractWithLoop(pdfBuffer, storeName, catalogueId, { store
     return extractWithoutChunkTracking(sql, pdfBuffer, storeName, catalogueId, { storeId, validFrom, validUntil });
   }
 
-  const pdfChunks = await splitPDF(pdfBuffer, 10);
+  const pdfChunks = await splitPDF(pdfBuffer, 2);
   console.log(`  Split into ${pdfChunks.length} chunk(s)`);
 
   let extractedValidFrom = validFrom;
@@ -420,8 +431,9 @@ export async function extractWithLoop(pdfBuffer, storeName, catalogueId, { store
         const pageHint = ` (pages ${startPage}-${endPage})`;
         console.log(`  Chunk ${i + 1}/${pdfChunks.length}: pages ${startPage}-${endPage}${retries ? ` (retry ${retries})` : ""}`);
 
+        const pageImages = await rasterizeChunkToJpegs(buffer, endPage - startPage + 1);
         const { products, validFrom: vf, validUntil: vu } = await extractChunkWithClaude(
-          buffer,
+          pageImages,
           storeName,
           pageHint
         );
