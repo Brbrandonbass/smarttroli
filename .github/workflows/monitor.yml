@@ -1,21 +1,14 @@
-name: Process Zambia Catalogue PDFs
+name: Monitor Zambia Store Catalogues
 
 on:
-  push:
-    paths:
-      - 'catalogues/zambia/**.pdf'
-      - 'catalogues/zambia/**.PDF'
+  schedule:
+    - cron: '0 */6 * * *'
   workflow_dispatch:
-    inputs:
-      target_file:
-        description: 'PDF filename in catalogues/zambia/ to process (leave empty for all)'
-        required: false
-        default: ''
 
 jobs:
-  process-pdfs:
+  monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
 
     steps:
       - name: Checkout code
@@ -29,9 +22,10 @@ jobs:
       - name: Install dependencies
         run: npm install @anthropic-ai/sdk @modelcontextprotocol/sdk @neondatabase/serverless pdf-lib node-fetch
 
-      - name: Process catalogue PDFs
+      - name: Run catalogue monitor
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          TARGET_FILE: ${{ github.event.inputs.target_file }}
-        run: node scripts/process-pdfs.js
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/monitor.js

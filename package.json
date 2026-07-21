@@ -10,7 +10,10 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "@neondatabase/serverless": "^1.1.0",
+    "node-fetch": "^3.3.2",
     "pdf-lib": "^1.17.1",
     "next": "16.2.6",
     "react": "19.2.4",
