@@ -86,6 +86,26 @@ function extractSingleDate(text) {
   return `${year}-${MONTH_NUM[mon]}-${day.padStart(2, "0")}`;
 }
 
+// Matches Shoprite's unseparated slug format, e.g. "20jul09aug2026" (from
+// URLs like .../zmselect20jul09aug2026/index.html) — two DDmon dates back to
+// back with no separator, which extractDateRange's separator requirement misses.
+function extractSlugDateRange(text) {
+  const pattern =
+    /(\d{2})(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(\d{2})(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)(\d{4})/i;
+  const m = text.match(pattern);
+  if (!m) return null;
+
+  const [, d1, mon1Raw, d2, mon2Raw, year] = m;
+  const mon1 = mon1Raw.toLowerCase();
+  const mon2 = mon2Raw.toLowerCase();
+  if (!MONTH_NUM[mon1] || !MONTH_NUM[mon2]) return null;
+
+  return {
+    validFrom: `${year}-${MONTH_NUM[mon1]}-${d1.padStart(2, "0")}`,
+    validUntil: `${year}-${MONTH_NUM[mon2]}-${d2.padStart(2, "0")}`,
+  };
+}
+
 // Used when no date range can be found in the filename or page text — assumes
 // a typical 2-week catalogue starting today.
 function fallbackDateRange() {
@@ -102,6 +122,10 @@ function resolveDateRange(...texts) {
   for (const text of texts) {
     const range = extractDateRange(text);
     if (range.validFrom) return { ...range, usedFallback: false };
+  }
+  for (const text of texts) {
+    const range = extractSlugDateRange(text);
+    if (range) return { ...range, usedFallback: false };
   }
   for (const text of texts) {
     const start = extractSingleDate(text);
@@ -132,16 +156,18 @@ async function fetchText(url) {
   return res.text();
 }
 
-async function fetchBuffer(url) {
-  const res = await fetch(url, {
-    headers: { "User-Agent": UA, Accept: "application/pdf,*/*" },
-    redirect: "follow",
-  });
+async function fetchBuffer(url, { referer } = {}) {
+  const headers = { "User-Agent": UA, Accept: "application/pdf,*/*" };
+  if (referer) headers.Referer = referer;
+  const res = await fetch(url, { headers, redirect: "follow" });
   return { ok: res.ok, status: res.status, buffer: res.ok ? Buffer.from(await res.arrayBuffer()) : null };
 }
 
+// Non-greedy up to the first ".pdf" rather than requiring the attribute to end
+// there — some sites (e.g. Shoprite's AEM DAM) embed the PDF path inside a
+// longer src, like ".../leaflet.pdf/_jcr_content/renditions/thumb.jpeg".
 function findPdfLinks(html, baseUrl, mustInclude) {
-  const linkRegex = /(?:href|src)\s*=\s*["']([^"']+\.pdf)["']/gi;
+  const linkRegex = /(?:href|src)\s*=\s*["']([^"']*?\.pdf)/gi;
   const links = [];
   let m;
   while ((m = linkRegex.exec(html))) {
@@ -337,13 +363,25 @@ async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclud
     }
 
     const pdfUrl = links[0];
-    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(pdfUrl, html);
+    // Prefer date text near this specific link over the whole page, in case
+    // multiple catalogues with different validity windows are listed.
+    const pdfPath = new URL(pdfUrl).pathname;
+    const pathIndex = html.indexOf(pdfPath);
+    const nearbyText = pathIndex >= 0 ? html.slice(Math.max(0, pathIndex - 200), pathIndex + 800) : html;
+    const { validFrom, validUntil, usedFallback: usedFallbackDates } = resolveDateRange(pdfUrl, nearbyText, html);
 
-    const { ok, status, buffer } = await fetchBuffer(pdfUrl);
+    // Some sites (e.g. Shoprite's CloudFront/WAF) reject direct asset fetches
+    // without a Referer pointing back at the page that linked to them.
+    const { ok, status, buffer } = await fetchBuffer(pdfUrl, { referer: pageUrl });
     if (!ok) {
       console.log(`  ✗ HTTP ${status} fetching ${pdfUrl}`);
       await logMonitor(storeName, pdfUrl, "error", `HTTP ${status}`);
       return { store: storeName, result: "error", detail: `HTTP ${status}` };
+    }
+    if (!isPdfBuffer(buffer)) {
+      console.log(`  ✗ Not a valid PDF (magic bytes check failed): ${pdfUrl}`);
+      await logMonitor(storeName, pdfUrl, "error", "downloaded content is not a valid PDF");
+      return { store: storeName, result: "error", detail: "invalid PDF content" };
     }
 
     const startTok = dateToFilenameToken(validFrom, false);
@@ -444,6 +482,9 @@ function checkShoprite() {
     storeName: "Shoprite",
     pageUrl: "https://www.shoprite.co.zm/specials.html",
     filenamePrefix: "Shoprite",
+    // Restricts matches to the AEM DAM leaflet path so unrelated .pdf links on
+    // the page (e.g. the footer's cookie-policy/data-privacy docs) are ignored.
+    mustInclude: "specials-leaflets",
   });
 }
 
