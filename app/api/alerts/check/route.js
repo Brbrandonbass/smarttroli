@@ -1,6 +1,9 @@
 // app/api/alerts/check/route.js
 // Called by the monitor.yml cron every 6 hours (and safe to hit manually/more
-// often — already-triggered alerts are skipped, so repeat calls are idempotent).
+// often — alerts are recurring: once fired, an alert goes on a 24-hour
+// cooldown (tracked via last_triggered) rather than being permanently
+// consumed, so it fires again on its own if the price is still at or below
+// target a day later.
 import { NextResponse } from "next/server";
 import { getSql, ensurePriceAlertsTable } from "../../../lib/db";
 import { getBestPrice } from "../../../lib/prices";
@@ -11,10 +14,12 @@ export async function GET() {
     const sql = getSql();
     await ensurePriceAlertsTable(sql);
 
+    // Alerts currently on cooldown are excluded here rather than filtered in
+    // JS, so we don't spend a price lookup on ones that can't fire anyway.
     const alerts = await sql`
       SELECT id, user_id, product_name, store_name, target_price
       FROM price_alerts
-      WHERE triggered = false
+      WHERE last_triggered IS NULL OR last_triggered <= NOW() - INTERVAL '24 hours'
     `;
 
     const triggered = [];
@@ -32,7 +37,7 @@ export async function GET() {
 
           await sql`
             UPDATE price_alerts
-            SET triggered = true, last_checked = NOW()
+            SET triggered = false, last_triggered = NOW(), last_checked = NOW()
             WHERE id = ${alert.id}
           `;
 

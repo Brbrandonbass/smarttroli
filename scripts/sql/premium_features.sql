@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Alerts are recurring: price_alerts/check resets triggered back to false
+-- and stamps last_triggered instead of leaving triggered permanently true, so
+-- the same alert fires again on its own once 24h have passed and the price
+-- is still at or below target.
 CREATE TABLE IF NOT EXISTS price_alerts (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id),
@@ -19,8 +23,13 @@ CREATE TABLE IF NOT EXISTS price_alerts (
   target_price DECIMAL(10,2) NOT NULL,
   triggered BOOLEAN DEFAULT false,
   last_checked TIMESTAMPTZ,
+  last_triggered TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Was added to price_alerts after it already existed in production —
+-- ADD COLUMN IF NOT EXISTS so this line is safe to run again.
+ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS last_triggered TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS shopping_lists (
   id SERIAL PRIMARY KEY,

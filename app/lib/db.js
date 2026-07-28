@@ -74,6 +74,9 @@ export async function ensurePriceAlertsTable(sql) {
       created_at TIMESTAMPTZ DEFAULT NOW()
     )
   `;
+  // Added after price_alerts already existed in production — ADD COLUMN IF
+  // NOT EXISTS so this is safe to run against both fresh and pre-existing tables.
+  await sql`ALTER TABLE price_alerts ADD COLUMN IF NOT EXISTS last_triggered TIMESTAMPTZ`;
   await sql`CREATE INDEX IF NOT EXISTS idx_alerts_user ON price_alerts(user_id)`;
   alertsEnsured = true;
 }
