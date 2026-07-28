@@ -270,6 +270,39 @@ export default function SmartTroli() {
     .filter(({ item }) => storeFilter === "All" || item.offers?.some((o) => o.store?.includes(storeFilter)));
   const storeComparison = computeStoreComparison(visibleResultsWithIndex.map(({ item }) => item));
 
+  // WhatsApp share always represents the whole list regardless of the
+  // active filter tab, so it's computed from the unfiltered results.
+  function buildWhatsAppShareText() {
+    const fullComparison = computeStoreComparison(results || []);
+    const best = fullComparison.find((r) => r.isBest);
+    const lines = ["🛒 My SmartTroli List"];
+
+    if (best) {
+      for (const item of results || []) {
+        const offer = (item.offers || [])
+          .filter((o) => o.store?.includes(best.store))
+          .map((o) => parsePrice(o.price))
+          .filter((p) => p !== null)
+          .sort((a, b) => a - b)[0];
+        if (offer !== undefined) lines.push(`- ${item.name} - K${offer.toFixed(2)} (${best.store})`);
+      }
+      lines.push(`Total: K${best.total.toFixed(2)} at ${best.store}`);
+    } else {
+      for (const item of results || []) {
+        if (item.cheapest) lines.push(`- ${item.name} - K${item.cheapest.price.toFixed(2)} (${item.cheapest.store})`);
+      }
+      if (totals) lines.push(`Total: K${totals.total.toFixed(2)}`);
+    }
+
+    lines.push("Compare prices: smarttroli.com");
+    return lines.join("\n");
+  }
+
+  function shareOnWhatsApp() {
+    const text = buildWhatsAppShareText();
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -917,6 +950,10 @@ export default function SmartTroli() {
             </button>
             <button style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg, #FF6B00, #FFD700)", border: "none", borderRadius: "12px", color: "#0D1B0F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
               🗺️ Get Directions
+            </button>
+            <button onClick={shareOnWhatsApp}
+              style={{ flex: 1, padding: "14px", background: "#25D366", border: "none", borderRadius: "12px", color: "#08240F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
+              💬 Share
             </button>
           </div>
         </div>
