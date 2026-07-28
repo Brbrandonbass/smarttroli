@@ -49,6 +49,41 @@ function computeTotals(results) {
   return { total, savings: maxTotal - total };
 }
 
+const COMPARISON_STORES = ["Shoprite", "Choppies", "Pick n Pay"];
+
+// For each store, sums that store's own cheapest offer per item — not the
+// item's global cheapest — so this answers "what would my whole list cost
+// at store X", not "what's the best price for each item individually".
+// A store missing even one item is "unavailable" rather than a partial sum,
+// since you can't complete the whole shop there in one stop.
+function computeStoreComparison(items) {
+  if (!items || items.length === 0) return [];
+
+  const rows = COMPARISON_STORES.map((store) => {
+    let total = 0;
+    let unavailableCount = 0;
+    for (const item of items) {
+      const cheapestAtStore = (item.offers || [])
+        .filter((o) => o.store?.includes(store))
+        .map((o) => parsePrice(o.price))
+        .filter((p) => p !== null)
+        .sort((a, b) => a - b)[0];
+      if (cheapestAtStore !== undefined) total += cheapestAtStore;
+      else unavailableCount++;
+    }
+    return { store, total, unavailableCount, available: unavailableCount === 0 };
+  });
+
+  rows.sort((a, b) => {
+    if (a.available !== b.available) return a.available ? -1 : 1;
+    if (a.available) return a.total - b.total;
+    return 0;
+  });
+
+  const bestIdx = rows.findIndex((r) => r.available);
+  return rows.map((r, i) => ({ ...r, isBest: i === bestIdx }));
+}
+
 const STORES = [
   { name: "Shoprite",     color: "#E31837" },
   { name: "Pick n Pay",   color: "#0066CC" },
@@ -227,6 +262,13 @@ export default function SmartTroli() {
   }
 
   const areaDisplay = manualArea || suburb || city || "Zambia";
+
+  // Same items the store filter tabs currently show — shared by the store
+  // comparison card so both stay in sync when the filter changes.
+  const visibleResultsWithIndex = (results || [])
+    .map((item, i) => ({ item, i }))
+    .filter(({ item }) => storeFilter === "All" || item.offers?.some((o) => o.store?.includes(storeFilter)));
+  const storeComparison = computeStoreComparison(visibleResultsWithIndex.map(({ item }) => item));
 
   return (
     <div style={{
@@ -620,6 +662,36 @@ export default function SmartTroli() {
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF6B00", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "10px" }}>Price Breakdown</div>
 
+            {/* Store comparison */}
+            {storeComparison.length > 0 && (
+              <div style={{
+                background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.2)",
+                borderRadius: "14px", padding: "14px 16px", marginBottom: "12px",
+              }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: "#FFD700", marginBottom: "9px" }}>
+                  🏪 Best store for your full list:
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {storeComparison.map((row) => (
+                    <div key={row.store} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                      <span style={{ color: row.isBest ? "#FFD700" : "rgba(245,240,232,0.75)", fontWeight: row.isBest ? 700 : 500 }}>
+                        {row.isBest ? "✓ " : ""}{row.store}
+                      </span>
+                      {row.available ? (
+                        <span style={{ color: row.isBest ? "#FFD700" : "rgba(245,240,232,0.6)", fontWeight: row.isBest ? 700 : 500 }}>
+                          K{row.total.toFixed(2)}{row.isBest ? " (best)" : ""}
+                        </span>
+                      ) : (
+                        <span style={{ color: "rgba(245,240,232,0.35)", fontStyle: "italic" }}>
+                          unavailable{row.unavailableCount > 0 ? ` (${row.unavailableCount} item${row.unavailableCount === 1 ? "" : "s"} missing)` : ""}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Store filter */}
             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
               {FILTER_STORES.map(store => {
@@ -641,9 +713,7 @@ export default function SmartTroli() {
               })}
             </div>
 
-            {results
-              .map((item, i) => ({ item, i }))
-              .filter(({ item }) => storeFilter === "All" || item.offers?.some(o => o.store?.includes(storeFilter)))
+            {visibleResultsWithIndex
               .map(({ item, i }) => {
               const isExpanded = expandedItem === i;
               const filteredOffer = storeFilter === "All" ? null : (() => {
