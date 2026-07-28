@@ -680,7 +680,12 @@ export default function SmartTroli() {
                         onClick={(e) => {
                           e.stopPropagation();
                           setAlertItem({
-                            productName: item.name,
+                            // Use the actual catalogue/community product name
+                            // (e.g. "Akshaya Parboiled Rice 5kg") rather than
+                            // the user's search term (e.g. "Mealie meal 5kg")
+                            // so /api/alerts/check can match it back to a
+                            // real catalogue_prices/community_prices row.
+                            productName: displayOffer?.note || item.name,
                             defaultStore: displayOffer?.store,
                             defaultTargetPrice: displayOffer?.price,
                           });
