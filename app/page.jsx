@@ -719,9 +719,9 @@ export default function SmartTroli() {
                       >
                         📍 Report
                       </button>
-                      {item.cheapest && (
+                      {displayOffer && (
                         <div style={{ background: "rgba(255,215,0,0.1)", border: "1.5px solid rgba(255,215,0,0.3)", borderRadius: "10px", padding: "6px 12px", fontSize: "16px", fontWeight: "800", color: "#FFD700" }}>
-                          K{item.cheapest.price.toFixed(2)}
+                          K{displayOffer.price.toFixed(2)}
                         </div>
                       )}
                       <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>{isExpanded ? "▲" : "▼"}</span>
