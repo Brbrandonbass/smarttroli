@@ -3,6 +3,7 @@
 
 import { useEffect, useState } from "react";
 import ReportPriceModal from "./components/ReportPriceModal";
+import PriceAlertModal from "./components/PriceAlertModal";
 import LivePricesFeed from "./components/LivePricesFeed";
 
 function timeAgo(dateStr) {
@@ -88,6 +89,7 @@ export default function SmartTroli() {
   const [phase, setPhase] = useState("input");
   const [savingsPhrase] = useState(SAVINGS_PHRASES[Math.floor(Math.random() * SAVINGS_PHRASES.length)]);
   const [reportItem, setReportItem] = useState(null); // { productName, defaultStore } | null
+  const [alertItem, setAlertItem] = useState(null); // { productName, defaultStore, defaultTargetPrice } | null
   const [votedIds, setVotedIds] = useState(new Set());
   const [voteOverrides, setVoteOverrides] = useState({}); // { [communityId]: { upvotes, downvotes, verified } }
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
@@ -587,6 +589,31 @@ export default function SmartTroli() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
+                          setAlertItem({
+                            productName: item.name,
+                            defaultStore: item.cheapest?.store,
+                            defaultTargetPrice: item.cheapest?.price,
+                          });
+                        }}
+                        aria-label="Set price alert"
+                        style={{
+                          background: "rgba(255,215,0,0.12)",
+                          border: "1px solid rgba(255,215,0,0.35)",
+                          borderRadius: "20px",
+                          padding: "5px 10px",
+                          fontSize: "11px",
+                          color: "#FFD700",
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        🔔
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setReportItem({ productName: item.name, defaultStore: item.cheapest?.store });
                         }}
                         style={{
@@ -713,6 +740,19 @@ export default function SmartTroli() {
             setReportItem(null);
             setToast("✓ Price reported — thanks for helping the community!");
             setFeedRefreshKey(k => k + 1);
+          }}
+        />
+      )}
+
+      {alertItem && (
+        <PriceAlertModal
+          productName={alertItem.productName}
+          defaultStore={alertItem.defaultStore}
+          defaultTargetPrice={alertItem.defaultTargetPrice}
+          onClose={() => setAlertItem(null)}
+          onCreated={() => {
+            setAlertItem(null);
+            setToast("🔔 Alert set! We'll notify you on Telegram when the price drops.");
           }}
         />
       )}

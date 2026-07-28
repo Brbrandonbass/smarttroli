@@ -29,3 +29,11 @@ jobs:
           SMARTTROLI_GITHUB_TOKEN: ${{ secrets.SMARTTROLI_GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: node scripts/monitor.js
+
+      - name: Check price alerts
+        run: |
+          curl -sS -X GET "https://www.smarttroli.com/api/alerts/check" \
+            -H "Accept: application/json" \
+            --max-time 120 \
+            --retry 2 --retry-delay 5 \
+            -w "\nHTTP %{http_code}\n"
