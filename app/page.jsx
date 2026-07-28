@@ -665,6 +665,11 @@ export default function SmartTroli() {
                         <span style={{ fontSize: "14px", fontWeight: "600", color: "#F5F0E8" }}>{item.name}</span>
                         {hasSpecial && <span style={{ fontSize: "10px", background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700", borderRadius: "10px", padding: "1px 7px", fontWeight: "700" }}>🏷️ SPECIAL</span>}
                       </div>
+                      {item.searchTerm && item.searchTerm.toLowerCase() !== item.name.toLowerCase() && (
+                        <div style={{ fontSize: "10px", color: "rgba(245,240,232,0.35)", marginBottom: "3px" }}>
+                          for &ldquo;{item.searchTerm}&rdquo;
+                        </div>
+                      )}
                       {displayOffer && (
                         <div style={{ fontSize: "12px", color: "#FF6B00", fontWeight: "500" }}>
                           {displayOffer.note && displayOffer.note.toLowerCase() !== item.name.toLowerCase() && (

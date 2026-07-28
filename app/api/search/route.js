@@ -337,7 +337,12 @@ Output ONLY valid JSON:
 
     const cheapest = combined[0] || null;
     return {
-      name: item,
+      // The card title is the actual matched product name (e.g. "Akshaya
+      // Parboiled Rice 5kg"), not the user's search term — showing the
+      // search term as the title mislabels whatever product actually
+      // matched. Falls back to the search term only when nothing matched.
+      name: cheapest?.note || item,
+      searchTerm: item,
       offers: combined,
       bestStore: cheapest?.store || null,
       bestPrice: cheapest?.price || null,
