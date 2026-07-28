@@ -279,6 +279,19 @@ function run(cmd) {
   }
 }
 
+// `git diff --cached --quiet` exits 0 when the index matches HEAD (nothing
+// staged) and 1 when there's a real diff — any other exit code is a genuine
+// git error and should still surface.
+function hasStagedChanges() {
+  try {
+    execSync("git diff --cached --quiet", { stdio: ["ignore", "ignore", "pipe"] });
+    return false;
+  } catch (err) {
+    if (err.status === 1) return true;
+    throw new Error(redact(err.stderr?.toString() || err.message));
+  }
+}
+
 function commitAndPushCatalogue(storeName, label) {
   if (!SMARTTROLI_GITHUB_TOKEN) {
     console.log("  SMARTTROLI_GITHUB_TOKEN not set — skipping git commit/push");
@@ -291,6 +304,10 @@ function commitAndPushCatalogue(storeName, label) {
     run(`git config user.name "SmartTroli Monitor"`);
 
     run("git add catalogues/zambia/");
+    if (!hasStagedChanges()) {
+      console.log("  no changes to commit");
+      return false;
+    }
     run(`git commit -m "Auto: ${storeName} catalogue ${label}"`);
     // actions/checkout persists an `http.https://github.com/.extraheader` auth
     // header for the default GITHUB_TOKEN (github-actions[bot]). That header
