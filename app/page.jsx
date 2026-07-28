@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import ReportPriceModal from "./components/ReportPriceModal";
 import PriceAlertModal from "./components/PriceAlertModal";
+import ShoppingListEmailModal from "./components/ShoppingListEmailModal";
 import LivePricesFeed from "./components/LivePricesFeed";
 
 function timeAgo(dateStr) {
@@ -90,6 +91,8 @@ export default function SmartTroli() {
   const [savingsPhrase] = useState(SAVINGS_PHRASES[Math.floor(Math.random() * SAVINGS_PHRASES.length)]);
   const [reportItem, setReportItem] = useState(null); // { productName, defaultStore } | null
   const [alertItem, setAlertItem] = useState(null); // { productName, defaultStore, defaultTargetPrice } | null
+  const [listModalMode, setListModalMode] = useState(null); // "save" | "load" | null
+  const [loadedListInfo, setLoadedListInfo] = useState(null); // { itemPrices, total } | null
   const [votedIds, setVotedIds] = useState(new Set());
   const [voteOverrides, setVoteOverrides] = useState({}); // { [communityId]: { upvotes, downvotes, verified } }
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
@@ -156,9 +159,10 @@ export default function SmartTroli() {
     setItems(prev => [...prev, sanitized]);
     setInput("");
     setApiError(null);
+    setLoadedListInfo(null);
   }
 
-  function removeItem(idx) { setItems(items.filter((_, i) => i !== idx)); }
+  function removeItem(idx) { setItems(items.filter((_, i) => i !== idx)); setLoadedListInfo(null); }
 
   async function analyze() {
     if (items.length === 0) { setApiError("Add at least one item first!"); return; }
@@ -448,6 +452,40 @@ export default function SmartTroli() {
                   ))}
                 </div>
               )}
+
+              {loadedListInfo && items.length > 0 && (
+                <div style={{
+                  marginTop: "12px", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)",
+                  borderRadius: "10px", padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <span style={{ fontSize: "12px", color: "rgba(245,240,232,0.6)" }}>Estimated total (best prices)</span>
+                  <span style={{ fontSize: "16px", fontWeight: 800, color: "#FFD700" }}>K{loadedListInfo.total.toFixed(2)}</span>
+                </div>
+              )}
+
+              <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                <button
+                  onClick={() => {
+                    if (items.length === 0) { setApiError("Add at least one item before saving!"); return; }
+                    setListModalMode("save");
+                  }}
+                  style={{
+                    flex: 1, background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)",
+                    borderRadius: "10px", padding: "8px 10px", fontSize: "12px", color: "#FFD700", cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  💾 Save List
+                </button>
+                <button
+                  onClick={() => setListModalMode("load")}
+                  style={{
+                    flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: "10px", padding: "8px 10px", fontSize: "12px", color: "rgba(245,240,232,0.8)", cursor: "pointer", fontWeight: 600,
+                  }}
+                >
+                  📥 Load my list
+                </button>
+              </div>
             </div>
 
             {apiError && (
@@ -753,6 +791,24 @@ export default function SmartTroli() {
           onCreated={() => {
             setAlertItem(null);
             setToast("🔔 Alert set! We'll notify you on Telegram when the price drops.");
+          }}
+        />
+      )}
+
+      {listModalMode && (
+        <ShoppingListEmailModal
+          mode={listModalMode}
+          items={items}
+          onClose={() => setListModalMode(null)}
+          onSaved={() => {
+            setListModalMode(null);
+            setToast("✓ List saved!");
+          }}
+          onLoaded={(data) => {
+            setListModalMode(null);
+            setItems(data.list.items);
+            setLoadedListInfo({ itemPrices: data.itemPrices, total: data.total });
+            setToast("✓ List loaded!");
           }}
         />
       )}
