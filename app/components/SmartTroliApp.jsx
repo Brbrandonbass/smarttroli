@@ -7,6 +7,7 @@ import ShoppingListEmailModal from "./ShoppingListEmailModal";
 import PriceHistoryModal from "./PriceHistoryModal";
 import LivePricesFeed from "./LivePricesFeed";
 import PwaInstallBanner from "./PwaInstallBanner";
+import HolidayBanner from "./HolidayBanner";
 
 function timeAgo(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -331,6 +332,8 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
       fontFamily: "'Segoe UI', -apple-system, sans-serif",
       color: "#F5F0E8",
     }}>
+
+      <HolidayBanner />
 
       {/* ── NAV ── */}
       <nav style={{
