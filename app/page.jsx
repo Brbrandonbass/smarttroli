@@ -57,6 +57,9 @@ const STORES = [
   { name: "Jumbo",        color: "#FFD700" },
 ];
 
+const FILTER_STORES = ["All", "Shoprite", "Choppies", "Pick n Pay"];
+const STORE_FILTER_KEY = "smarttroli_store_filter";
+
 const QUICK_ITEMS = [
   "Mealie meal 5kg", "Bread", "Eggs 30s", "Chicken pieces",
   "Cooking oil 2L", "Sugar 2kg", "Rice 2kg", "Kapenta",
@@ -93,6 +96,7 @@ export default function SmartTroli() {
   const [alertItem, setAlertItem] = useState(null); // { productName, defaultStore, defaultTargetPrice } | null
   const [listModalMode, setListModalMode] = useState(null); // "save" | "load" | null
   const [loadedListInfo, setLoadedListInfo] = useState(null); // { itemPrices, total } | null
+  const [storeFilter, setStoreFilter] = useState("All");
   const [votedIds, setVotedIds] = useState(new Set());
   const [voteOverrides, setVoteOverrides] = useState({}); // { [communityId]: { upvotes, downvotes, verified } }
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
@@ -104,6 +108,18 @@ export default function SmartTroli() {
       setVotedIds(new Set(stored));
     } catch { /* ignore malformed/blocked localStorage */ }
   }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(STORE_FILTER_KEY);
+      if (stored && FILTER_STORES.includes(stored)) setStoreFilter(stored);
+    } catch { /* ignore malformed/blocked localStorage */ }
+  }, []);
+
+  function selectStoreFilter(store) {
+    setStoreFilter(store);
+    try { localStorage.setItem(STORE_FILTER_KEY, store); } catch { /* ignore blocked localStorage */ }
+  }
 
   useEffect(() => {
     if (!toast) return;
@@ -601,9 +617,43 @@ export default function SmartTroli() {
           {/* Price breakdown */}
           <div style={{ marginBottom: "20px" }}>
             <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF6B00", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "10px" }}>Price Breakdown</div>
-            {results.map((item, i) => {
+
+            {/* Store filter */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+              {FILTER_STORES.map(store => {
+                const count = store === "All"
+                  ? results.length
+                  : results.filter(r => r.offers?.some(o => o.store?.includes(store))).length;
+                const active = storeFilter === store;
+                return (
+                  <button key={store} onClick={() => selectStoreFilter(store)}
+                    style={{
+                      background: active ? "linear-gradient(135deg, #FF6B00, #FFD700)" : "rgba(255,255,255,0.05)",
+                      border: `1px solid ${active ? "transparent" : "rgba(255,255,255,0.15)"}`,
+                      borderRadius: "20px", padding: "6px 12px", fontSize: "12px", fontWeight: 700,
+                      color: active ? "#0D1B0F" : "rgba(245,240,232,0.7)", cursor: "pointer", whiteSpace: "nowrap",
+                    }}>
+                    {store} <span style={{ opacity: 0.7 }}>({count})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {results
+              .map((item, i) => ({ item, i }))
+              .filter(({ item }) => storeFilter === "All" || item.offers?.some(o => o.store?.includes(storeFilter)))
+              .map(({ item, i }) => {
               const isExpanded = expandedItem === i;
-              const hasSpecial = item.offers?.some(o => o.onSpecial);
+              const filteredOffer = storeFilter === "All" ? null : (() => {
+                const o = item.offers?.find(x => x.store?.includes(storeFilter));
+                if (!o) return null;
+                const p = parsePrice(o.price);
+                return p !== null ? { ...o, price: p } : null;
+              })();
+              const displayOffer = filteredOffer || item.cheapest;
+              const hasSpecial = storeFilter === "All"
+                ? item.offers?.some(o => o.onSpecial)
+                : !!filteredOffer?.onSpecial;
               return (
                 <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", marginBottom: "8px", overflow: "hidden" }}>
                   <div onClick={() => setExpandedItem(isExpanded ? null : i)}
@@ -613,13 +663,13 @@ export default function SmartTroli() {
                         <span style={{ fontSize: "14px", fontWeight: "600", color: "#F5F0E8" }}>{item.name}</span>
                         {hasSpecial && <span style={{ fontSize: "10px", background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700", borderRadius: "10px", padding: "1px 7px", fontWeight: "700" }}>🏷️ SPECIAL</span>}
                       </div>
-                      {item.cheapest && (
+                      {displayOffer && (
                         <div style={{ fontSize: "12px", color: "#FF6B00", fontWeight: "500" }}>
-                          {item.cheapest.note && item.cheapest.note.toLowerCase() !== item.name.toLowerCase() && (
-                            <div style={{ fontSize: "11px", color: "rgba(245,240,232,0.5)", fontWeight: "400", marginBottom: "1px" }}>{item.cheapest.note}</div>
+                          {displayOffer.note && displayOffer.note.toLowerCase() !== item.name.toLowerCase() && (
+                            <div style={{ fontSize: "11px", color: "rgba(245,240,232,0.5)", fontWeight: "400", marginBottom: "1px" }}>{displayOffer.note}</div>
                           )}
-                          Best: K{item.cheapest.price.toFixed(2)} at {item.cheapest.store}
-                          <span style={{ color: "rgba(245,240,232,0.3)", fontWeight: "400" }}> · {item.cheapest.source || "Est. price"}</span>
+                          {filteredOffer ? "" : "Best: "}K{displayOffer.price.toFixed(2)} at {displayOffer.store}
+                          <span style={{ color: "rgba(245,240,232,0.3)", fontWeight: "400" }}> · {displayOffer.source || "Est. price"}</span>
                         </div>
                       )}
                     </div>
@@ -629,8 +679,8 @@ export default function SmartTroli() {
                           e.stopPropagation();
                           setAlertItem({
                             productName: item.name,
-                            defaultStore: item.cheapest?.store,
-                            defaultTargetPrice: item.cheapest?.price,
+                            defaultStore: displayOffer?.store,
+                            defaultTargetPrice: displayOffer?.price,
                           });
                         }}
                         aria-label="Set price alert"
@@ -652,7 +702,7 @@ export default function SmartTroli() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setReportItem({ productName: item.name, defaultStore: item.cheapest?.store });
+                          setReportItem({ productName: item.name, defaultStore: displayOffer?.store });
                         }}
                         style={{
                           background: "rgba(59,130,246,0.12)",
