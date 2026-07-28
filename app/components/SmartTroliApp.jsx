@@ -6,6 +6,7 @@ import PriceAlertModal from "./PriceAlertModal";
 import ShoppingListEmailModal from "./ShoppingListEmailModal";
 import PriceHistoryModal from "./PriceHistoryModal";
 import LivePricesFeed from "./LivePricesFeed";
+import PwaInstallBanner from "./PwaInstallBanner";
 
 function timeAgo(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -1039,6 +1040,8 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
           }}
         />
       )}
+
+      <PwaInstallBanner />
 
       {toast && (
         <div style={{
