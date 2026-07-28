@@ -11,6 +11,7 @@ import { execSync } from "child_process";
 import { writeFileSync, readFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { randomUUID } from "crypto";
+import { ensurePriceHistoryTable } from "../app/lib/db.js";
 
 export const MODEL = "claude-sonnet-4-6";
 export const MCP_BETA = "mcp-client-2025-04-04";
@@ -329,15 +330,23 @@ async function upsertChunkRow(sql, catalogueId, chunkIndex, startPage, endPage, 
 }
 
 async function saveChunkProducts(sql, catalogueId, storeId, storeName, products, validFrom, validUntil) {
+  await ensurePriceHistoryTable(sql);
+
   let saved = 0;
   for (const p of products) {
     if (!p.name || p.price <= 0) continue;
+    const name = p.name.slice(0, 500);
     try {
       await sql`
         INSERT INTO catalogue_prices (catalogue_id, store_id, store_name, product_name, price, is_special, valid_from, valid_until)
-        VALUES (${catalogueId}, ${storeId}, ${storeName}, ${p.name.slice(0, 500)}, ${p.price}, ${p.isSpecial ?? true}, ${validFrom}, ${validUntil})
+        VALUES (${catalogueId}, ${storeId}, ${storeName}, ${name}, ${p.price}, ${p.isSpecial ?? true}, ${validFrom}, ${validUntil})
       `;
       saved++;
+
+      await sql`
+        INSERT INTO price_history (product_name, store_name, price, source)
+        VALUES (${name}, ${storeName}, ${p.price}, 'catalogue')
+      `;
     } catch { /* skip duplicates */ }
   }
   return saved;
