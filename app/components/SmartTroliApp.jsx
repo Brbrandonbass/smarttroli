@@ -1129,7 +1129,7 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
             </button>
             <button onClick={shareListLink} className="btn-lift"
               style={{ flex: 1, padding: "13px 8px", background: "rgba(249,115,22,0.14)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: "12px", color: "#F97316", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
-              🔗 Share Link
+              🔗 Share List
             </button>
           </div>
 
