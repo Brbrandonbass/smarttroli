@@ -410,11 +410,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
       {/* ── NAV ── */}
       <nav style={{
-        background: "rgba(13,27,15,0.95)",
-        backdropFilter: "blur(12px)",
-        borderBottom: "1px solid rgba(255,165,0,0.2)",
+        background: "rgba(13,27,15,0.85)",
+        backdropFilter: "blur(14px) saturate(1.4)",
+        WebkitBackdropFilter: "blur(14px) saturate(1.4)",
+        borderBottom: "1px solid rgba(249,115,22,0.22)",
         padding: "0 20px",
-        height: "60px",
+        height: "64px",
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
@@ -422,21 +423,22 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
         top: 0,
         zIndex: 100,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
           <div style={{
-            width: "36px", height: "36px",
-            background: "linear-gradient(135deg, #FF6B00, #FFD700)",
-            borderRadius: "10px",
+            width: "38px", height: "38px",
+            background: "linear-gradient(135deg, #FF6B00, #F97316 55%, #FFD700)",
+            borderRadius: "11px",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "18px",
+            fontSize: "19px",
+            boxShadow: "0 3px 12px rgba(249,115,22,0.4)",
           }}>🛒</div>
           <div>
-            <span style={{ fontSize: "18px", fontWeight: "800", color: "#FFD700", letterSpacing: "-0.5px" }}>Smart</span>
-            <span style={{ fontSize: "18px", fontWeight: "800", color: "#FF6B00", letterSpacing: "-0.5px" }}>Troli</span>
-            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.4)", marginLeft: "6px" }}>🇿🇲 Zambia</span>
+            <span style={{ fontSize: "19px", fontWeight: "800", color: "#FFD700", letterSpacing: "-0.6px" }}>Smart</span>
+            <span style={{ fontSize: "19px", fontWeight: "800", color: "#FF6B00", letterSpacing: "-0.6px" }}>Troli</span>
+            <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", marginLeft: "7px", fontWeight: 500 }}>🇿🇲 Zambia</span>
           </div>
         </div>
-        <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", background: "rgba(255,165,0,0.1)", border: "1px solid rgba(255,165,0,0.2)", padding: "4px 10px", borderRadius: "20px" }}>
+        <div style={{ fontSize: "11.5px", fontWeight: 700, color: "#F97316", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.3)", padding: "5px 11px", borderRadius: "20px", letterSpacing: "0.2px" }}>
           ZMW Kwacha
         </div>
       </nav>
@@ -445,47 +447,47 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
         <>
           {/* ── HERO ── */}
           <div style={{
-            background: "linear-gradient(180deg, #1A3A1F 0%, #0D1B0F 100%)",
-            padding: "36px 20px 32px",
+            background: "linear-gradient(180deg, #1F3D22 0%, #0D1B0F 100%)",
+            padding: "42px 20px 36px",
             textAlign: "center",
-            borderBottom: "1px solid rgba(255,165,0,0.15)",
+            borderBottom: "1px solid rgba(249,115,22,0.18)",
             position: "relative",
             overflow: "hidden",
           }}>
-            {/* Decorative circles */}
-            <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px", background: "rgba(255,107,0,0.08)", borderRadius: "50%" }} />
-            <div style={{ position: "absolute", bottom: "-30px", left: "-30px", width: "120px", height: "120px", background: "rgba(255,215,0,0.06)", borderRadius: "50%" }} />
+            {/* Decorative glows */}
+            <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "200px", height: "200px", background: "radial-gradient(circle, rgba(249,115,22,0.14), transparent 70%)" }} />
+            <div style={{ position: "absolute", bottom: "-40px", left: "-40px", width: "160px", height: "160px", background: "radial-gradient(circle, rgba(255,215,0,0.08), transparent 70%)" }} />
 
             <div style={{ position: "relative" }}>
-              <div style={{ fontSize: "12px", color: "#FFD700", letterSpacing: "3px", textTransform: "uppercase", marginBottom: "10px", opacity: 0.8 }}>
+              <div style={{ fontSize: "12px", color: "#FFD700", letterSpacing: "3.5px", textTransform: "uppercase", marginBottom: "12px", opacity: 0.85, fontWeight: 700 }}>
                 🇿🇲 Zambia's Smart Shopping App
               </div>
               <h1 style={{
-                margin: "0 0 8px",
-                fontSize: "clamp(26px, 6vw, 42px)",
+                margin: "0 0 10px",
+                fontSize: "clamp(28px, 7vw, 46px)",
                 fontWeight: "900",
                 color: "#F5F0E8",
-                letterSpacing: "-1px",
-                lineHeight: 1.1,
+                letterSpacing: "-1.2px",
+                lineHeight: 1.08,
               }}>
                 Save More<br />
-                <span style={{ color: "#FFD700" }}>Every Week</span>
+                <span style={{ background: "linear-gradient(135deg, #FFD700, #F97316)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>Every Week</span>
               </h1>
-              <p style={{ color: "rgba(245,240,232,0.55)", margin: "0 0 22px", fontSize: "14px" }}>
+              <p style={{ color: "rgba(245,240,232,0.6)", margin: "0 0 24px", fontSize: "14.5px", fontWeight: 500 }}>
                 Find the best deals across Zambian stores
               </p>
 
               {/* Store pills */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", justifyContent: "center" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "center" }}>
                 {STORES.map(s => (
                   <span key={s.name} style={{
                     background: "rgba(255,255,255,0.06)",
-                    border: "1px solid rgba(255,255,255,0.12)",
+                    border: "1px solid rgba(255,255,255,0.14)",
                     borderRadius: "20px",
-                    padding: "4px 12px",
-                    fontSize: "11px",
-                    color: "rgba(245,240,232,0.75)",
-                    fontWeight: "500",
+                    padding: "5px 13px",
+                    fontSize: "11.5px",
+                    color: "rgba(245,240,232,0.8)",
+                    fontWeight: "600",
                   }}>
                     {s.name}
                   </span>
@@ -494,17 +496,17 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
             </div>
           </div>
 
-          <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px 16px 80px" }}>
+          <div style={{ maxWidth: "600px", margin: "0 auto", padding: "18px 18px 90px" }}>
 
             <LivePricesFeed refreshKey={feedRefreshKey} />
 
             {/* ── LOCATION ── */}
             <div style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,215,0,0.15)",
-              borderRadius: "14px",
-              padding: "14px 16px",
-              marginBottom: "12px",
+              background: "rgba(255,255,255,0.035)",
+              border: "1px solid rgba(249,115,22,0.2)",
+              borderRadius: "16px",
+              padding: "15px 17px",
+              marginBottom: "14px",
             }}>
               {editingLocation ? (
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -549,17 +551,17 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
             {/* ── SHOPPING LIST ── */}
             <div style={{
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "14px",
-              padding: "16px",
-              marginBottom: "12px",
+              background: "rgba(255,255,255,0.035)",
+              border: "1px solid rgba(255,255,255,0.09)",
+              borderRadius: "16px",
+              padding: "18px",
+              marginBottom: "14px",
             }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF6B00", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "12px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "#F97316", textTransform: "uppercase", letterSpacing: "2.2px", marginBottom: "14px" }}>
                 🛒 Your Shopping List
               </div>
 
-              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
                 <input
                   value={input}
                   onChange={e => setInput(e.target.value)}
@@ -569,24 +571,26 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                     flex: 1,
                     background: "rgba(255,255,255,0.06)",
                     border: "1.5px solid rgba(255,255,255,0.1)",
-                    borderRadius: "10px",
-                    padding: "12px 14px",
+                    borderRadius: "11px",
+                    padding: "13px 14px",
                     fontSize: "15px",
+                    fontWeight: 500,
                     color: "#F5F0E8",
                     outline: "none",
                     transition: "border-color 0.2s",
                   }}
-                  onFocus={e => e.target.style.borderColor = "#FFD700"}
+                  onFocus={e => e.target.style.borderColor = "#F97316"}
                   onBlur={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}
                 />
-                <button onClick={() => addItem()}
+                <button onClick={() => addItem()} className="btn-lift"
                   style={{
                     background: "linear-gradient(135deg, #FF6B00, #FFD700)",
-                    border: "none", borderRadius: "10px",
-                    width: "48px", height: "48px",
+                    border: "none", borderRadius: "11px",
+                    width: "50px", height: "50px",
                     color: "#0D1B0F", fontSize: "24px",
                     cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
                     flexShrink: 0, fontWeight: "700",
+                    boxShadow: "0 3px 12px rgba(249,115,22,0.3)",
                   }}>+</button>
               </div>
 
@@ -653,33 +657,36 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
                 <button
                   onClick={() => {
                     if (items.length === 0) { setApiError("Add at least one item before saving!"); return; }
                     setListModalMode("save");
                   }}
+                  className="btn-lift"
                   style={{
-                    flex: 1, minWidth: "100px", background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.3)",
-                    borderRadius: "10px", padding: "8px 10px", fontSize: "12px", color: "#FFD700", cursor: "pointer", fontWeight: 600,
+                    flex: 1, minWidth: "100px", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.35)",
+                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "#F97316", cursor: "pointer", fontWeight: 700,
                   }}
                 >
                   💾 Save List
                 </button>
                 <button
                   onClick={() => setListModalMode("load")}
+                  className="btn-lift"
                   style={{
                     flex: 1, minWidth: "100px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
-                    borderRadius: "10px", padding: "8px 10px", fontSize: "12px", color: "rgba(245,240,232,0.8)", cursor: "pointer", fontWeight: 600,
+                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "rgba(245,240,232,0.85)", cursor: "pointer", fontWeight: 700,
                   }}
                 >
                   📥 Load my list
                 </button>
                 <button
                   onClick={shareListLink}
+                  className="btn-lift"
                   style={{
                     flex: 1, minWidth: "100px", background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.35)",
-                    borderRadius: "10px", padding: "8px 10px", fontSize: "12px", color: "#25D366", cursor: "pointer", fontWeight: 600,
+                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "#25D366", cursor: "pointer", fontWeight: 700,
                   }}
                 >
                   🔗 Share List
@@ -695,17 +702,18 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
             {/* ── SEARCH BUTTON ── */}
             <button onClick={analyze} disabled={items.length === 0 || loading}
+              className={items.length > 0 && !loading ? "btn-lift" : ""}
               style={{
-                width: "100%", padding: "18px",
+                width: "100%", padding: "19px",
                 background: items.length > 0 && !loading
-                  ? "linear-gradient(135deg, #FF6B00 0%, #FFD700 100%)"
+                  ? "linear-gradient(135deg, #FF6B00 0%, #F97316 50%, #FFD700 100%)"
                   : "rgba(255,255,255,0.06)",
-                border: "none", borderRadius: "14px",
+                border: "none", borderRadius: "16px",
                 color: items.length > 0 && !loading ? "#0D1B0F" : "rgba(245,240,232,0.2)",
-                fontSize: "16px", fontWeight: "800",
+                fontSize: "16.5px", fontWeight: "800",
                 cursor: items.length > 0 && !loading ? "pointer" : "not-allowed",
                 letterSpacing: "-0.3px",
-                boxShadow: items.length > 0 && !loading ? "0 4px 24px rgba(255,107,0,0.4)" : "none",
+                boxShadow: items.length > 0 && !loading ? "0 6px 28px rgba(249,115,22,0.4)" : "none",
                 transition: "all 0.2s",
               }}>
               {loading ? (
@@ -721,39 +729,40 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
       {/* ── RESULTS ── */}
       {phase === "results" && results && totals && (
-        <div style={{ maxWidth: "600px", margin: "0 auto", padding: "16px 16px 80px" }}>
+        <div style={{ maxWidth: "600px", margin: "0 auto", padding: "18px 18px 90px" }}>
 
           {/* Savings hero */}
           <div style={{
-            background: "linear-gradient(135deg, #1A3A1F, #0D2B12)",
-            border: "1px solid rgba(255,215,0,0.2)",
-            borderRadius: "18px",
-            padding: "24px 20px",
+            background: "linear-gradient(135deg, #1D3F21, #0D2412)",
+            border: "1px solid rgba(249,115,22,0.25)",
+            borderRadius: "20px",
+            padding: "28px 22px",
             marginBottom: "16px",
             textAlign: "center",
             position: "relative",
             overflow: "hidden",
+            boxShadow: "0 8px 28px rgba(0,0,0,0.25)",
           }}>
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: "linear-gradient(90deg, #FF6B00, #FFD700, #FF6B00)" }} />
-            <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.5)", letterSpacing: "2px", marginBottom: "4px", textTransform: "uppercase" }}>{savingsPhrase}</div>
-            <div style={{ fontSize: "clamp(48px, 14vw, 72px)", fontWeight: "900", color: "#FFD700", lineHeight: 1, letterSpacing: "-2px" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #FF6B00, #FFD700, #F97316)" }} />
+            <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.55)", letterSpacing: "2.5px", marginBottom: "6px", textTransform: "uppercase", fontWeight: 700 }}>{savingsPhrase}</div>
+            <div style={{ fontSize: "clamp(50px, 15vw, 76px)", fontWeight: "900", color: "#FFD700", lineHeight: 1, letterSpacing: "-2.5px", textShadow: "0 4px 24px rgba(255,215,0,0.2)" }}>
               K{totals.savings.toFixed(2)}
             </div>
-            <div style={{ fontSize: "14px", color: "rgba(245,240,232,0.5)", marginTop: "6px" }}>
-              Optimal basket: <strong style={{ color: "#F5F0E8" }}>K{totals.total.toFixed(2)}</strong>
+            <div style={{ fontSize: "14.5px", color: "rgba(245,240,232,0.55)", marginTop: "8px", fontWeight: 500 }}>
+              Optimal basket: <strong style={{ color: "#F5F0E8", fontWeight: 800 }}>K{totals.total.toFixed(2)}</strong>
             </div>
-            <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
-              <span style={{ background: "rgba(255,215,0,0.1)", border: "1px solid rgba(255,215,0,0.25)", borderRadius: "20px", padding: "4px 12px", fontSize: "12px", color: "#FFD700" }}>
+            <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
+              <span style={{ background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.3)", borderRadius: "20px", padding: "5px 13px", fontSize: "12px", color: "#FFB067", fontWeight: 600 }}>
                 📍 {areaDisplay}
               </span>
               {totals.specialsFound > 0 && (
-                <span style={{ background: "rgba(255,107,0,0.15)", border: "1px solid rgba(255,107,0,0.3)", borderRadius: "20px", padding: "4px 12px", fontSize: "12px", color: "#FF6B00" }}>
+                <span style={{ background: "rgba(255,215,0,0.12)", border: "1px solid rgba(255,215,0,0.3)", borderRadius: "20px", padding: "5px 13px", fontSize: "12px", color: "#FFD700", fontWeight: 600 }}>
                   🏷️ {totals.specialsFound} special{totals.specialsFound !== 1 ? "s" : ""}
                 </span>
               )}
             </div>
             {totals.tip && (
-              <div style={{ marginTop: "12px", background: "rgba(255,255,255,0.05)", borderRadius: "10px", padding: "10px 14px", fontSize: "13px", color: "rgba(245,240,232,0.7)", fontStyle: "italic" }}>
+              <div style={{ marginTop: "14px", background: "rgba(255,255,255,0.05)", borderRadius: "12px", padding: "11px 15px", fontSize: "13px", color: "rgba(245,240,232,0.75)", fontStyle: "italic", lineHeight: 1.5 }}>
                 💡 {totals.tip}
               </div>
             )}
@@ -761,90 +770,134 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
           {/* Shopping plan */}
           {optimalPlan && optimalPlan.length > 0 && (
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF6B00", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "10px" }}>Shopping Plan</div>
+            <div style={{ marginBottom: "18px" }}>
+              <div style={{ fontSize: "11px", fontWeight: "800", color: "#F97316", textTransform: "uppercase", letterSpacing: "2.2px", marginBottom: "11px" }}>Shopping Plan</div>
               {optimalPlan.map((stop, i) => {
                 const storeColor = STORES.find(s => stop.store?.includes(s.name))?.color || "#FF6B00";
                 return (
-                  <div key={i} style={{
-                    background: "rgba(255,255,255,0.04)",
-                    border: `1px solid rgba(255,255,255,0.06)`,
+                  <div key={i} className="card-lift" style={{
+                    background: "rgba(255,255,255,0.035)",
+                    border: `1px solid rgba(255,255,255,0.07)`,
                     borderLeft: `4px solid ${storeColor}`,
-                    borderRadius: "14px", padding: "16px",
+                    borderRadius: "16px", padding: "17px",
                     marginBottom: "10px",
                   }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "11px" }}>
                       <div>
-                        <div style={{ fontSize: "16px", fontWeight: "700", color: "#F5F0E8" }}>{stop.branch || stop.store}</div>
-                        <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.4)", marginTop: "2px" }}>Stop {i + 1} of {optimalPlan.length}</div>
+                        <div style={{ fontSize: "16.5px", fontWeight: "800", color: "#F5F0E8", letterSpacing: "-0.2px" }}>{stop.branch || stop.store}</div>
+                        <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.45)", marginTop: "3px", fontWeight: 500 }}>Stop {i + 1} of {optimalPlan.length}</div>
                       </div>
-                      <div style={{ background: `${storeColor}20`, border: `1.5px solid ${storeColor}`, borderRadius: "10px", padding: "8px 14px", fontSize: "18px", fontWeight: "800", color: storeColor }}>
+                      <div style={{ background: `${storeColor}22`, border: `1.5px solid ${storeColor}`, borderRadius: "11px", padding: "8px 14px", fontSize: "18px", fontWeight: "800", color: storeColor }}>
                         K{stop.subtotal?.toFixed(2)}
                       </div>
                     </div>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                       {stop.items?.map((item, j) => (
-                        <span key={j} style={{ background: `${storeColor}15`, border: `1px solid ${storeColor}30`, borderRadius: "20px", padding: "4px 10px", fontSize: "12px", color: "rgba(245,240,232,0.8)" }}>{item}</span>
+                        <span key={j} style={{ background: `${storeColor}18`, border: `1px solid ${storeColor}35`, borderRadius: "20px", padding: "4px 11px", fontSize: "12px", color: "rgba(245,240,232,0.85)", fontWeight: 500 }}>{item}</span>
                       ))}
                     </div>
                   </div>
                 );
               })}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,215,0,0.08)", border: "1px solid rgba(255,215,0,0.2)", borderRadius: "12px", padding: "14px 18px" }}>
-                <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.5)", textTransform: "uppercase", letterSpacing: "1px" }}>Total</div>
-                <div style={{ fontSize: "28px", fontWeight: "900", color: "#FFD700", letterSpacing: "-1px" }}>K{totals.total.toFixed(2)}</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "linear-gradient(135deg, rgba(255,215,0,0.1), rgba(249,115,22,0.08))", border: "1px solid rgba(255,215,0,0.25)", borderRadius: "14px", padding: "15px 19px" }}>
+                <div style={{ fontSize: "12px", color: "rgba(245,240,232,0.55)", textTransform: "uppercase", letterSpacing: "1.2px", fontWeight: 700 }}>Total</div>
+                <div style={{ fontSize: "29px", fontWeight: "900", color: "#FFD700", letterSpacing: "-1px" }}>K{totals.total.toFixed(2)}</div>
               </div>
             </div>
           )}
 
           {/* Price breakdown */}
-          <div style={{ marginBottom: "20px" }}>
-            <div style={{ fontSize: "11px", fontWeight: "700", color: "#FF6B00", textTransform: "uppercase", letterSpacing: "2px", marginBottom: "10px" }}>Price Breakdown</div>
+          <div style={{ marginBottom: "22px" }}>
+            <div style={{ fontSize: "11px", fontWeight: "800", color: "#F97316", textTransform: "uppercase", letterSpacing: "2.2px", marginBottom: "11px" }}>Price Breakdown</div>
 
-            {/* Store comparison */}
-            {storeComparison.length > 0 && (
-              <div style={{
-                background: "rgba(255,215,0,0.06)", border: "1px solid rgba(255,215,0,0.2)",
-                borderRadius: "14px", padding: "14px 16px", marginBottom: "12px",
-              }}>
-                <div style={{ fontSize: "12px", fontWeight: 700, color: "#FFD700", marginBottom: "9px" }}>
-                  🏪 Best store for your full list:
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {storeComparison.map((row) => (
-                    <div key={row.store} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
-                      <span style={{ color: row.isBest ? "#FFD700" : "rgba(245,240,232,0.75)", fontWeight: row.isBest ? 700 : 500 }}>
-                        {row.isBest ? "✓ " : ""}{row.store}
-                      </span>
-                      {row.available ? (
-                        <span style={{ color: row.isBest ? "#FFD700" : "rgba(245,240,232,0.6)", fontWeight: row.isBest ? 700 : 500 }}>
-                          K{row.total.toFixed(2)}{row.isBest ? " (best)" : ""}
+            {/* Store comparison — the headline element: which single store to shop at */}
+            {storeComparison.length > 0 && (() => {
+              const best = storeComparison.find((r) => r.isBest);
+              const rest = storeComparison.filter((r) => r !== best);
+              const dotColor = (storeName) => STORES.find((s) => storeName.includes(s.name))?.color || "#F97316";
+
+              return (
+                <div style={{
+                  position: "relative", overflow: "hidden",
+                  background: "linear-gradient(160deg, rgba(249,115,22,0.16), rgba(20,16,8,0.4) 55%, rgba(255,255,255,0.02))",
+                  border: "1.5px solid rgba(249,115,22,0.45)",
+                  borderRadius: "20px", padding: "20px",
+                  marginBottom: "14px",
+                  boxShadow: "0 10px 32px rgba(249,115,22,0.14), inset 0 1px 0 rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ position: "absolute", top: "-70px", right: "-50px", width: "180px", height: "180px", background: "radial-gradient(circle, rgba(255,215,0,0.18), transparent 70%)", pointerEvents: "none" }} />
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", position: "relative" }}>
+                    <span style={{ fontSize: "18px" }}>🏪</span>
+                    <span style={{ fontSize: "11px", fontWeight: 800, color: "#FFD700", textTransform: "uppercase", letterSpacing: "2.5px" }}>
+                      Best Store For Your List
+                    </span>
+                  </div>
+
+                  {best ? (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: "12px", position: "relative" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                          <span style={{ width: "10px", height: "10px", borderRadius: "50%", flexShrink: 0, background: dotColor(best.store), boxShadow: `0 0 10px ${dotColor(best.store)}` }} />
+                          <span style={{ fontSize: "23px", fontWeight: 800, color: "#F5F0E8", letterSpacing: "-0.6px", lineHeight: 1.1 }}>
+                            {best.store}
+                          </span>
+                        </div>
+                        <span style={{
+                          fontSize: "10.5px", fontWeight: 800, color: "#0D1B0F", background: "linear-gradient(135deg, #FFD700, #FF6B00)",
+                          padding: "4px 11px", borderRadius: "20px", letterSpacing: "0.3px", whiteSpace: "nowrap",
+                        }}>
+                          🏆 CHEAPEST OVERALL
                         </span>
-                      ) : (
-                        <span style={{ color: "rgba(245,240,232,0.35)", fontStyle: "italic" }}>
-                          unavailable{row.unavailableCount > 0 ? ` (${row.unavailableCount} item${row.unavailableCount === 1 ? "" : "s"} missing)` : ""}
-                        </span>
-                      )}
+                      </div>
+                      <div style={{ fontSize: "clamp(30px, 9vw, 40px)", fontWeight: 900, color: "#FFD700", letterSpacing: "-1.5px", lineHeight: 1, textShadow: "0 2px 20px rgba(255,215,0,0.25)", flexShrink: 0 }}>
+                        K{best.total.toFixed(2)}
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div style={{ fontSize: "13px", color: "rgba(245,240,232,0.55)", position: "relative" }}>
+                      No single store has everything on your list — see the breakdown below.
+                    </div>
+                  )}
+
+                  {rest.length > 0 && (
+                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", marginTop: "16px", paddingTop: "13px", display: "flex", flexDirection: "column", gap: "9px", position: "relative" }}>
+                      {rest.map((row) => (
+                        <div key={row.store} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: dotColor(row.store), opacity: 0.65 }} />
+                            <span style={{ color: "rgba(245,240,232,0.75)", fontWeight: 600 }}>{row.store}</span>
+                          </div>
+                          {row.available ? (
+                            <span style={{ color: "rgba(245,240,232,0.6)", fontWeight: 700 }}>K{row.total.toFixed(2)}</span>
+                          ) : (
+                            <span style={{ color: "rgba(245,240,232,0.32)", fontStyle: "italic", fontSize: "12px" }}>
+                              unavailable{row.unavailableCount > 0 ? ` (${row.unavailableCount} missing)` : ""}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* Store filter */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "13px" }}>
               {FILTER_STORES.map(store => {
                 const count = store === "All"
                   ? results.length
                   : results.filter(r => r.offers?.some(o => o.store?.includes(store))).length;
                 const active = storeFilter === store;
                 return (
-                  <button key={store} onClick={() => selectStoreFilter(store)}
+                  <button key={store} onClick={() => selectStoreFilter(store)} className="btn-lift"
                     style={{
                       background: active ? "linear-gradient(135deg, #FF6B00, #FFD700)" : "rgba(255,255,255,0.05)",
                       border: `1px solid ${active ? "transparent" : "rgba(255,255,255,0.15)"}`,
-                      borderRadius: "20px", padding: "6px 12px", fontSize: "12px", fontWeight: 700,
+                      borderRadius: "20px", padding: "7px 13px", fontSize: "12.5px", fontWeight: 700,
                       color: active ? "#0D1B0F" : "rgba(245,240,232,0.7)", cursor: "pointer", whiteSpace: "nowrap",
+                      boxShadow: active ? "0 3px 12px rgba(249,115,22,0.35)" : "none",
                     }}>
                     {store} <span style={{ opacity: 0.7 }}>({count})</span>
                   </button>
@@ -866,30 +919,41 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 ? item.offers?.some(o => o.onSpecial)
                 : !!filteredOffer?.onSpecial;
               return (
-                <div key={i} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "14px", marginBottom: "8px", overflow: "hidden" }}>
+                <div key={i} className="card-lift" style={{ background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: "16px", marginBottom: "9px", overflow: "hidden" }}>
                   <div onClick={() => setExpandedItem(isExpanded ? null : i)}
-                    style={{ padding: "14px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "3px" }}>
-                        <span style={{ fontSize: "14px", fontWeight: "600", color: "#F5F0E8" }}>{item.name}</span>
-                        {hasSpecial && <span style={{ fontSize: "10px", background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700", borderRadius: "10px", padding: "1px 7px", fontWeight: "700" }}>🏷️ SPECIAL</span>}
+                    style={{ padding: "15px 16px", cursor: "pointer" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "3px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "14.5px", fontWeight: "700", color: "#F5F0E8", letterSpacing: "-0.1px" }}>{item.name}</span>
+                          {hasSpecial && <span style={{ fontSize: "10px", background: "rgba(255,215,0,0.15)", border: "1px solid rgba(255,215,0,0.3)", color: "#FFD700", borderRadius: "10px", padding: "1px 7px", fontWeight: "700" }}>🏷️ SPECIAL</span>}
+                        </div>
+                        {item.searchTerm && item.searchTerm.toLowerCase() !== item.name.toLowerCase() && (
+                          <div style={{ fontSize: "10px", color: "rgba(245,240,232,0.35)", marginBottom: "3px" }}>
+                            for &ldquo;{item.searchTerm}&rdquo;
+                          </div>
+                        )}
+                        {displayOffer && (
+                          <div style={{ fontSize: "12px", color: "#FF6B00", fontWeight: "500" }}>
+                            {displayOffer.note && displayOffer.note.toLowerCase() !== item.name.toLowerCase() && (
+                              <div style={{ fontSize: "11px", color: "rgba(245,240,232,0.5)", fontWeight: "400", marginBottom: "1px" }}>{displayOffer.note}</div>
+                            )}
+                            {filteredOffer ? "" : "Best: "}K{displayOffer.price.toFixed(2)} at {displayOffer.store}
+                            <span style={{ color: "rgba(245,240,232,0.3)", fontWeight: "400" }}> · {displayOffer.source || "Est. price"}</span>
+                          </div>
+                        )}
                       </div>
-                      {item.searchTerm && item.searchTerm.toLowerCase() !== item.name.toLowerCase() && (
-                        <div style={{ fontSize: "10px", color: "rgba(245,240,232,0.35)", marginBottom: "3px" }}>
-                          for &ldquo;{item.searchTerm}&rdquo;
-                        </div>
-                      )}
-                      {displayOffer && (
-                        <div style={{ fontSize: "12px", color: "#FF6B00", fontWeight: "500" }}>
-                          {displayOffer.note && displayOffer.note.toLowerCase() !== item.name.toLowerCase() && (
-                            <div style={{ fontSize: "11px", color: "rgba(245,240,232,0.5)", fontWeight: "400", marginBottom: "1px" }}>{displayOffer.note}</div>
-                          )}
-                          {filteredOffer ? "" : "Best: "}K{displayOffer.price.toFixed(2)} at {displayOffer.store}
-                          <span style={{ color: "rgba(245,240,232,0.3)", fontWeight: "400" }}> · {displayOffer.source || "Est. price"}</span>
-                        </div>
-                      )}
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                        {displayOffer && (
+                          <div style={{ background: "rgba(255,215,0,0.1)", border: "1.5px solid rgba(255,215,0,0.3)", borderRadius: "11px", padding: "6px 13px", fontSize: "16px", fontWeight: "800", color: "#FFD700", whiteSpace: "nowrap" }}>
+                            K{displayOffer.price.toFixed(2)}
+                          </div>
+                        )}
+                        <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>{isExpanded ? "▲" : "▼"}</span>
+                      </div>
                     </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px", marginTop: "11px" }}>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -905,11 +969,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                           });
                         }}
                         aria-label="Set price alert"
+                        className="btn-lift"
                         style={{
                           background: "rgba(255,215,0,0.12)",
                           border: "1px solid rgba(255,215,0,0.35)",
                           borderRadius: "20px",
-                          padding: "5px 10px",
+                          padding: "6px 11px",
                           fontSize: "11px",
                           color: "#FFD700",
                           cursor: "pointer",
@@ -926,11 +991,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                           setHistoryItem({ productName: item.name, defaultStore: displayOffer?.store });
                         }}
                         aria-label="Price history"
+                        className="btn-lift"
                         style={{
                           background: "rgba(168,85,247,0.12)",
                           border: "1px solid rgba(168,85,247,0.35)",
                           borderRadius: "20px",
-                          padding: "5px 10px",
+                          padding: "6px 11px",
                           fontSize: "11px",
                           color: "#A855F7",
                           cursor: "pointer",
@@ -946,11 +1012,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                           e.stopPropagation();
                           setReportItem({ productName: item.name, defaultStore: displayOffer?.store });
                         }}
+                        className="btn-lift"
                         style={{
                           background: "rgba(59,130,246,0.12)",
                           border: "1px solid rgba(59,130,246,0.35)",
                           borderRadius: "20px",
-                          padding: "5px 10px",
+                          padding: "6px 11px",
                           fontSize: "11px",
                           color: "#3B82F6",
                           cursor: "pointer",
@@ -961,12 +1028,6 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                       >
                         📍 Report
                       </button>
-                      {displayOffer && (
-                        <div style={{ background: "rgba(255,215,0,0.1)", border: "1.5px solid rgba(255,215,0,0.3)", borderRadius: "10px", padding: "6px 12px", fontSize: "16px", fontWeight: "800", color: "#FFD700" }}>
-                          K{displayOffer.price.toFixed(2)}
-                        </div>
-                      )}
-                      <span style={{ color: "rgba(255,255,255,0.2)", fontSize: "12px" }}>{isExpanded ? "▲" : "▼"}</span>
                     </div>
                   </div>
                   {isExpanded && (
@@ -1047,20 +1108,28 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
           </div>
 
           {/* Actions */}
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={reset}
-              style={{ flex: 1, padding: "14px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px", color: "rgba(245,240,232,0.7)", fontSize: "15px", fontWeight: "600", cursor: "pointer" }}
-              onMouseEnter={e => e.target.style.borderColor = "#FFD700"}
-              onMouseLeave={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}>
+          <button onClick={getDirections} className="btn-lift"
+            style={{
+              width: "100%", padding: "16px", marginBottom: "10px",
+              background: "linear-gradient(135deg, #FF6B00, #F97316 50%, #FFD700)",
+              border: "none", borderRadius: "14px", color: "#0D1B0F", fontSize: "16px", fontWeight: "800",
+              cursor: "pointer", letterSpacing: "-0.2px", boxShadow: "0 6px 20px rgba(249,115,22,0.35)",
+            }}>
+            🗺️ Get Directions to Cheapest Store
+          </button>
+
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button onClick={reset} className="btn-lift"
+              style={{ flex: 1, padding: "13px 8px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.12)", borderRadius: "12px", color: "rgba(245,240,232,0.75)", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
               ← New List
             </button>
-            <button onClick={getDirections}
-              style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg, #FF6B00, #FFD700)", border: "none", borderRadius: "12px", color: "#0D1B0F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
-              🗺️ Get Directions
+            <button onClick={shareOnWhatsApp} className="btn-lift"
+              style={{ flex: 1, padding: "13px 8px", background: "rgba(37,211,102,0.14)", border: "1px solid rgba(37,211,102,0.4)", borderRadius: "12px", color: "#25D366", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
+              💬 WhatsApp
             </button>
-            <button onClick={shareOnWhatsApp}
-              style={{ flex: 1, padding: "14px", background: "#25D366", border: "none", borderRadius: "12px", color: "#08240F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
-              💬 Share
+            <button onClick={shareListLink} className="btn-lift"
+              style={{ flex: 1, padding: "13px 8px", background: "rgba(249,115,22,0.14)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: "12px", color: "#F97316", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
+              🔗 Share Link
             </button>
           </div>
 
@@ -1158,12 +1227,30 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
 
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        @keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        input::placeholder { color: rgba(245,240,232,0.25); }
-        body { -webkit-font-smoothing: antialiased; background: #0D1B0F; }
+        html { -webkit-tap-highlight-color: transparent; }
+        body {
+          -webkit-font-smoothing: antialiased;
+          -moz-osx-font-smoothing: grayscale;
+          background: #0D1B0F;
+          text-rendering: optimizeLegibility;
+        }
+        input::placeholder { color: rgba(245,240,232,0.28); }
+        button { font-family: inherit; }
+        button:focus-visible, input:focus-visible, a:focus-visible {
+          outline: 2px solid #FFD700;
+          outline-offset: 2px;
+        }
+        .btn-lift { transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease; }
+        .btn-lift:hover { transform: translateY(-1.5px); filter: brightness(1.07); }
+        .btn-lift:active { transform: translateY(0); filter: brightness(0.96); }
+        .card-lift { transition: border-color 0.15s ease, transform 0.15s ease; }
+        .card-lift:hover { border-color: rgba(249,115,22,0.35) !important; }
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-track { background: #0D1B0F; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.2); border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,215,0,0.25); border-radius: 2px; }
       `}</style>
     </div>
   );

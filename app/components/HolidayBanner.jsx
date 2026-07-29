@@ -91,38 +91,48 @@ export default function HolidayBanner() {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #FF6B00, #FFD700)",
+        background: "linear-gradient(135deg, #FF6B00, #F97316 55%, #FFD700)",
         color: "#0D1B0F",
-        padding: "10px 16px",
+        padding: "12px 44px 12px 16px",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: "10px",
+        gap: "12px",
         flexWrap: "wrap",
-        fontSize: "13px",
-        fontWeight: 600,
+        fontSize: "13.5px",
+        fontWeight: 700,
         textAlign: "center",
         position: "relative",
+        boxShadow: "0 2px 16px rgba(249,115,22,0.35)",
       }}
     >
       <span>
-        🎉 Today is {holiday.name} — stores may have reduced hours
+        🎉 Today is <strong>{holiday.name}</strong> — stores may have reduced hours
       </span>
       <a
         href="https://publicholiday.today"
         target="_blank"
         rel="noopener noreferrer"
-        style={{ color: "#0D1B0F", textDecoration: "underline", fontWeight: 700, whiteSpace: "nowrap" }}
+        style={{
+          color: "#0D1B0F",
+          fontWeight: 800,
+          whiteSpace: "nowrap",
+          background: "rgba(13,27,15,0.14)",
+          padding: "4px 12px",
+          borderRadius: "20px",
+          fontSize: "12.5px",
+          textDecoration: "none",
+        }}
       >
-        publicholiday.today
+        publicholiday.today ↗
       </a>
       <button
         onClick={dismiss}
         aria-label="Dismiss"
         style={{
-          background: "rgba(13,27,15,0.15)", border: "none", borderRadius: "50%",
-          width: "22px", height: "22px", color: "#0D1B0F", fontSize: "16px",
-          cursor: "pointer", lineHeight: 1, position: "absolute", right: "10px", top: "50%",
+          background: "rgba(13,27,15,0.18)", border: "none", borderRadius: "50%",
+          width: "24px", height: "24px", color: "#0D1B0F", fontSize: "17px",
+          cursor: "pointer", lineHeight: 1, position: "absolute", right: "12px", top: "50%",
           transform: "translateY(-50%)", display: "flex", alignItems: "center", justifyContent: "center",
         }}
       >
