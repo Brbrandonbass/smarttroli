@@ -1,7 +1,8 @@
 // scripts/monitor.js
-// Auto-fetches current catalogue PDFs for Pick n Pay, Shoprite, and Choppies
-// (Zambia), saves any new one to catalogues/zambia/, and commits + pushes it
-// so the process-pdfs.yml workflow picks it up. Logs every check to monitor_log.
+// Auto-fetches current catalogue PDFs for Pick n Pay, Shoprite, Choppies,
+// Game, and Spar (Zambia), saves any new one to catalogues/zambia/, and
+// commits + pushes it so the process-pdfs.yml workflow picks it up. Logs
+// every check to monitor_log.
 
 import { neon } from "@neondatabase/serverless";
 import fetch from "node-fetch";
@@ -361,15 +362,10 @@ async function checkChoppies() {
   }
 }
 
-async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclude }) {
-  console.log(`\n🔍 Checking ${storeName}: ${pageUrl}`);
-
-  if (await hasKnownCatalogue(storeName)) {
-    console.log("  ⏭️  Already have a known catalogue — skipping");
-    await logMonitor(storeName, pageUrl, "skipped", "valid_until already on file");
-    return { store: storeName, result: "skipped" };
-  }
-
+// Single-URL attempt shared by checkPdfFromPage and checkPdfFromPages — does
+// not check hasKnownCatalogue itself (callers do that once, up front).
+async function tryPdfFromPage(pageUrl, { storeName, filenamePrefix, mustInclude }) {
+  console.log(`  → ${pageUrl}`);
   try {
     const html = await fetchText(pageUrl);
     const links = findPdfLinks(html, pageUrl, mustInclude);
@@ -421,6 +417,37 @@ async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclud
     await logMonitor(storeName, pageUrl, "error", err.message);
     return { store: storeName, result: "error", detail: err.message };
   }
+}
+
+async function checkPdfFromPage({ storeName, pageUrl, filenamePrefix, mustInclude }) {
+  console.log(`\n🔍 Checking ${storeName}: ${pageUrl}`);
+
+  if (await hasKnownCatalogue(storeName)) {
+    console.log("  ⏭️  Already have a known catalogue — skipping");
+    await logMonitor(storeName, pageUrl, "skipped", "valid_until already on file");
+    return { store: storeName, result: "skipped" };
+  }
+
+  return tryPdfFromPage(pageUrl, { storeName, filenamePrefix, mustInclude });
+}
+
+// Tries each candidate page in turn (e.g. a specials aggregator, then the
+// store's own site), stopping at the first one with a usable PDF.
+async function checkPdfFromPages({ storeName, pageUrls, filenamePrefix, mustInclude }) {
+  console.log(`\n🔍 Checking ${storeName} (${pageUrls.length} source(s))`);
+
+  if (await hasKnownCatalogue(storeName)) {
+    console.log("  ⏭️  Already have a known catalogue — skipping");
+    await logMonitor(storeName, pageUrls[0], "skipped", "valid_until already on file");
+    return { store: storeName, result: "skipped" };
+  }
+
+  let lastResult = null;
+  for (const pageUrl of pageUrls) {
+    lastResult = await tryPdfFromPage(pageUrl, { storeName, filenamePrefix, mustInclude });
+    if (lastResult.result === "new_catalogue") return lastResult;
+  }
+  return lastResult;
 }
 
 // Pick n Pay's promotions page renders the actual catalogue via JavaScript —
@@ -505,6 +532,37 @@ function checkShoprite() {
   });
 }
 
+// Neither source currently exposes a real downloadable PDF — guzzle.co.za's
+// Game Zambia listing renders each catalogue as a page-flip image viewer
+// (zero .pdf references anywhere in the page or its per-catalogue detail
+// pages), and game.co.zm/promotions/promotions just embeds that same guzzle
+// widget via JS. Both are tried anyway so this starts working automatically
+// the moment either site adds a real PDF; until then this correctly and
+// harmlessly logs "skipped" each run, same as Pick n Pay does when its page
+// is JS-only.
+function checkGame() {
+  return checkPdfFromPages({
+    storeName: "Game",
+    pageUrls: [
+      "https://www.guzzle.co.za/game-zambia/lusaka/",
+      "https://www.game.co.zm/promotions/promotions",
+    ],
+    filenamePrefix: "Game",
+  });
+}
+
+// guzzle.co.za has no Spar Zambia page at all (this exact URL 404s, and no
+// other slug on the site covers Zambia for Spar — its /spar/ page is
+// South-Africa-only). Kept as-is so it starts working the moment guzzle (or
+// Spar Zambia directly) publishes one at this address.
+function checkSpar() {
+  return checkPdfFromPage({
+    storeName: "Spar",
+    pageUrl: "https://www.guzzle.co.za/spar-zambia/",
+    filenamePrefix: "Spar",
+  });
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -516,6 +574,8 @@ async function main() {
     await checkChoppies(),
     await checkPickNPay(),
     await checkShoprite(),
+    await checkGame(),
+    await checkSpar(),
   ];
 
   console.log("\n================================");

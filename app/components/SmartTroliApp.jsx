@@ -94,9 +94,6 @@ const STORES = [
   { name: "Jumbo",        color: "#FFD700" },
 ];
 
-// Only stores we have real catalogue data for — shown as pills in the hero.
-const HERO_STORES = ["Shoprite", "Choppies"];
-
 const FILTER_STORES = ["All", "Shoprite", "Choppies", "Pick n Pay"];
 const STORE_FILTER_KEY = "smarttroli_store_filter";
 const DIRECTIONS_PREF_KEY = "smarttroli_directions_pref";
@@ -502,10 +499,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 Find the best deals across Zambian stores
               </p>
 
-              {/* Store pills — only stores with real catalogue data */}
+              {/* Store pills — all stores are searchable; only Shoprite and
+                  Choppies have real catalogue data, the rest fall back to
+                  clearly-labeled AI-estimated prices. */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "center" }}>
-                {HERO_STORES.map(name => (
-                  <span key={name} style={{
+                {STORES.map(s => (
+                  <span key={s.name} style={{
                     background: "rgba(255,255,255,0.06)",
                     border: "1px solid rgba(255,255,255,0.14)",
                     borderRadius: "20px",
@@ -514,7 +513,7 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                     color: "rgba(245,240,232,0.8)",
                     fontWeight: "600",
                   }}>
-                    {name}
+                    {s.name}
                   </span>
                 ))}
               </div>
@@ -715,6 +714,32 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 </div>
               )}
 
+              {/* ── FIND BEST DEALS — the natural next step once the list has items ── */}
+              {items.length > 0 && (
+                <button onClick={analyze} disabled={loading}
+                  className={!loading ? "btn-lift" : ""}
+                  style={{
+                    width: "100%", padding: "17px", marginTop: "14px",
+                    background: !loading
+                      ? "linear-gradient(135deg, #FF6B00 0%, #F97316 50%, #FFD700 100%)"
+                      : "rgba(255,255,255,0.06)",
+                    border: "none", borderRadius: "14px",
+                    color: !loading ? "#0D1B0F" : "rgba(245,240,232,0.3)",
+                    fontSize: "16px", fontWeight: "800",
+                    cursor: !loading ? "pointer" : "not-allowed",
+                    letterSpacing: "-0.2px",
+                    boxShadow: !loading ? "0 6px 24px rgba(249,115,22,0.4)" : "none",
+                    transition: "all 0.2s",
+                  }}>
+                  {loading ? (
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+                      <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
+                      {loadingStage}
+                    </span>
+                  ) : "🔍 Find Best Deals →"}
+                </button>
+              )}
+
               <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
                 {items.length > 0 && (
                   <button
@@ -746,30 +771,6 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 {apiError}
               </div>
             )}
-
-            {/* ── SEARCH BUTTON ── */}
-            <button onClick={analyze} disabled={items.length === 0 || loading}
-              className={items.length > 0 && !loading ? "btn-lift" : ""}
-              style={{
-                width: "100%", padding: "19px",
-                background: items.length > 0 && !loading
-                  ? "linear-gradient(135deg, #FF6B00 0%, #F97316 50%, #FFD700 100%)"
-                  : "rgba(255,255,255,0.06)",
-                border: "none", borderRadius: "16px",
-                color: items.length > 0 && !loading ? "#0D1B0F" : "rgba(245,240,232,0.2)",
-                fontSize: "16.5px", fontWeight: "800",
-                cursor: items.length > 0 && !loading ? "pointer" : "not-allowed",
-                letterSpacing: "-0.3px",
-                boxShadow: items.length > 0 && !loading ? "0 6px 28px rgba(249,115,22,0.4)" : "none",
-                transition: "all 0.2s",
-              }}>
-              {loading ? (
-                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
-                  <span style={{ animation: "spin 1s linear infinite", display: "inline-block" }}>⟳</span>
-                  {loadingStage}
-                </span>
-              ) : items.length === 0 ? "Add items to get started" : `🔍 Find Best Deals in ${areaDisplay}`}
-            </button>
 
             {/* ── PUBLIC HOLIDAY FEATURED CARD ── */}
             <a
