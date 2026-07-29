@@ -715,8 +715,8 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 </div>
               )}
 
-              {items.length > 0 && (
-                <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
+                {items.length > 0 && (
                   <button
                     onClick={() => setListModalMode("save")}
                     className="btn-lift"
@@ -727,18 +727,18 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                   >
                     💾 Save List
                   </button>
-                  <button
-                    onClick={() => setListModalMode("load")}
-                    className="btn-lift"
-                    style={{
-                      flex: 1, minWidth: "100px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
-                      borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "rgba(245,240,232,0.85)", cursor: "pointer", fontWeight: 700,
-                    }}
-                  >
-                    📥 Load my list
-                  </button>
-                </div>
-              )}
+                )}
+                <button
+                  onClick={() => setListModalMode("load")}
+                  className="btn-lift"
+                  style={{
+                    flex: 1, minWidth: "100px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "rgba(245,240,232,0.85)", cursor: "pointer", fontWeight: 700,
+                  }}
+                >
+                  📥 Load my list
+                </button>
+              </div>
             </div>
 
             {apiError && (
@@ -1197,10 +1197,12 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
               style={{ flex: 1, padding: "13px 8px", background: "rgba(37,211,102,0.14)", border: "1px solid rgba(37,211,102,0.4)", borderRadius: "12px", color: "#25D366", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
               💬 WhatsApp
             </button>
-            <button onClick={shareListLink} className="btn-lift"
-              style={{ flex: 1, padding: "13px 8px", background: "rgba(249,115,22,0.14)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: "12px", color: "#F97316", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
-              🔗 Share my list
-            </button>
+            {items.length > 0 && (
+              <button onClick={shareListLink} className="btn-lift"
+                style={{ flex: 1, padding: "13px 8px", background: "rgba(249,115,22,0.14)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: "12px", color: "#F97316", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
+                🔗 Share my list
+              </button>
+            )}
           </div>
 
           {showAreaInput && (
