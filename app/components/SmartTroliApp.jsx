@@ -94,6 +94,9 @@ const STORES = [
   { name: "Jumbo",        color: "#FFD700" },
 ];
 
+// Only stores we have real catalogue data for — shown as pills in the hero.
+const HERO_STORES = ["Shoprite", "Choppies"];
+
 const FILTER_STORES = ["All", "Shoprite", "Choppies", "Pick n Pay"];
 const STORE_FILTER_KEY = "smarttroli_store_filter";
 const DIRECTIONS_PREF_KEY = "smarttroli_directions_pref";
@@ -142,6 +145,7 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
   const [toast, setToast] = useState(null);
   const [showAreaInput, setShowAreaInput] = useState(false);
   const [areaInputValue, setAreaInputValue] = useState("");
+  const [showTellAFriendOptions, setShowTellAFriendOptions] = useState(false);
 
   useEffect(() => {
     try {
@@ -398,6 +402,31 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
     }
   }
 
+  async function tellAFriend() {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "SmartTroli",
+          text: "Compare grocery prices across Zambian stores and save money every week!",
+          url: "https://smarttroli.com",
+        });
+      } catch {
+        // user cancelled the share sheet — no-op
+      }
+    } else {
+      setShowTellAFriendOptions((v) => !v);
+    }
+  }
+
+  async function copyAppLink() {
+    try {
+      await navigator.clipboard.writeText("https://smarttroli.com");
+      setToast("🔗 Link copied!");
+    } catch {
+      setApiError("Copy failed — here's the link: https://smarttroli.com");
+    }
+  }
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -454,10 +483,6 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
             position: "relative",
             overflow: "hidden",
           }}>
-            {/* Decorative glows */}
-            <div style={{ position: "absolute", top: "-50px", right: "-50px", width: "200px", height: "200px", background: "radial-gradient(circle, rgba(249,115,22,0.14), transparent 70%)" }} />
-            <div style={{ position: "absolute", bottom: "-40px", left: "-40px", width: "160px", height: "160px", background: "radial-gradient(circle, rgba(255,215,0,0.08), transparent 70%)" }} />
-
             <div style={{ position: "relative" }}>
               <div style={{ fontSize: "12px", color: "#FFD700", letterSpacing: "3.5px", textTransform: "uppercase", marginBottom: "12px", opacity: 0.85, fontWeight: 700 }}>
                 🇿🇲 Zambia's Smart Shopping App
@@ -477,10 +502,10 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 Find the best deals across Zambian stores
               </p>
 
-              {/* Store pills */}
+              {/* Store pills — only stores with real catalogue data */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", justifyContent: "center" }}>
-                {STORES.map(s => (
-                  <span key={s.name} style={{
+                {HERO_STORES.map(name => (
+                  <span key={name} style={{
                     background: "rgba(255,255,255,0.06)",
                     border: "1px solid rgba(255,255,255,0.14)",
                     borderRadius: "20px",
@@ -489,7 +514,7 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                     color: "rgba(245,240,232,0.8)",
                     fontWeight: "600",
                   }}>
-                    {s.name}
+                    {name}
                   </span>
                 ))}
               </div>
@@ -497,6 +522,39 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
           </div>
 
           <div style={{ maxWidth: "600px", margin: "0 auto", padding: "18px 18px 90px" }}>
+
+            {/* ── TELL A FRIEND ── */}
+            <button onClick={tellAFriend} className="btn-lift"
+              style={{
+                width: "100%", padding: "14px", marginBottom: "14px",
+                background: "rgba(249,115,22,0.14)", border: "1.5px solid #F97316",
+                borderRadius: "14px", color: "#F97316", fontSize: "15px", fontWeight: "800",
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              }}>
+              💬 Tell a Friend
+            </button>
+            {showTellAFriendOptions && (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "14px", marginTop: "-6px" }}>
+                <a
+                  href={`https://wa.me/?text=${encodeURIComponent("Check out SmartTroli — compare grocery prices across Zambian stores! https://smarttroli.com")}`}
+                  target="_blank" rel="noopener noreferrer" className="btn-lift"
+                  style={{
+                    flex: 1, textAlign: "center", padding: "11px", background: "rgba(37,211,102,0.14)",
+                    border: "1px solid rgba(37,211,102,0.4)", borderRadius: "12px", color: "#25D366",
+                    fontSize: "13px", fontWeight: "700", textDecoration: "none",
+                  }}>
+                  💬 WhatsApp
+                </a>
+                <button onClick={copyAppLink} className="btn-lift"
+                  style={{
+                    flex: 1, padding: "11px", background: "rgba(249,115,22,0.12)",
+                    border: "1px solid rgba(249,115,22,0.35)", borderRadius: "12px", color: "#F97316",
+                    fontSize: "13px", fontWeight: "700", cursor: "pointer",
+                  }}>
+                  🔗 Copy Link
+                </button>
+              </div>
+            )}
 
             <LivePricesFeed refreshKey={feedRefreshKey} />
 
@@ -657,41 +715,30 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 </div>
               )}
 
-              <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
-                <button
-                  onClick={() => {
-                    if (items.length === 0) { setApiError("Add at least one item before saving!"); return; }
-                    setListModalMode("save");
-                  }}
-                  className="btn-lift"
-                  style={{
-                    flex: 1, minWidth: "100px", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.35)",
-                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "#F97316", cursor: "pointer", fontWeight: 700,
-                  }}
-                >
-                  💾 Save List
-                </button>
-                <button
-                  onClick={() => setListModalMode("load")}
-                  className="btn-lift"
-                  style={{
-                    flex: 1, minWidth: "100px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
-                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "rgba(245,240,232,0.85)", cursor: "pointer", fontWeight: 700,
-                  }}
-                >
-                  📥 Load my list
-                </button>
-                <button
-                  onClick={shareListLink}
-                  className="btn-lift"
-                  style={{
-                    flex: 1, minWidth: "100px", background: "rgba(37,211,102,0.1)", border: "1px solid rgba(37,211,102,0.35)",
-                    borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "#25D366", cursor: "pointer", fontWeight: 700,
-                  }}
-                >
-                  🔗 Share List
-                </button>
-              </div>
+              {items.length > 0 && (
+                <div style={{ display: "flex", gap: "8px", marginTop: "14px", flexWrap: "wrap" }}>
+                  <button
+                    onClick={() => setListModalMode("save")}
+                    className="btn-lift"
+                    style={{
+                      flex: 1, minWidth: "100px", background: "rgba(249,115,22,0.12)", border: "1px solid rgba(249,115,22,0.35)",
+                      borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "#F97316", cursor: "pointer", fontWeight: 700,
+                    }}
+                  >
+                    💾 Save List
+                  </button>
+                  <button
+                    onClick={() => setListModalMode("load")}
+                    className="btn-lift"
+                    style={{
+                      flex: 1, minWidth: "100px", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)",
+                      borderRadius: "11px", padding: "10px 10px", fontSize: "12.5px", color: "rgba(245,240,232,0.85)", cursor: "pointer", fontWeight: 700,
+                    }}
+                  >
+                    📥 Load my list
+                  </button>
+                </div>
+              )}
             </div>
 
             {apiError && (
@@ -723,6 +770,29 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
                 </span>
               ) : items.length === 0 ? "Add items to get started" : `🔍 Find Best Deals in ${areaDisplay}`}
             </button>
+
+            {/* ── PUBLIC HOLIDAY FEATURED CARD ── */}
+            <a
+              href="https://publicholiday.today"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="card-lift"
+              style={{
+                display: "block", marginTop: "16px", textDecoration: "none",
+                background: "rgba(255,255,255,0.035)", border: "1px solid rgba(255,255,255,0.08)",
+                borderLeft: "4px solid #F97316", borderRadius: "14px", padding: "16px 18px",
+              }}
+            >
+              <div style={{ fontSize: "15px", fontWeight: "800", color: "#F5F0E8", marginBottom: "4px" }}>
+                📅 Planning your week?
+              </div>
+              <div style={{ fontSize: "13px", color: "rgba(245,240,232,0.6)", marginBottom: "8px" }}>
+                Check Zambian public holidays before you shop
+              </div>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#F97316" }}>
+                → Visit publicholiday.today
+              </div>
+            </a>
           </div>
         </>
       )}
@@ -1129,7 +1199,7 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
             </button>
             <button onClick={shareListLink} className="btn-lift"
               style={{ flex: 1, padding: "13px 8px", background: "rgba(249,115,22,0.14)", border: "1px solid rgba(249,115,22,0.4)", borderRadius: "12px", color: "#F97316", fontSize: "13px", fontWeight: "700", cursor: "pointer" }}>
-              🔗 Share List
+              🔗 Share my list
             </button>
           </div>
 
