@@ -96,6 +96,7 @@ const STORES = [
 
 const FILTER_STORES = ["All", "Shoprite", "Choppies", "Pick n Pay"];
 const STORE_FILTER_KEY = "smarttroli_store_filter";
+const DIRECTIONS_PREF_KEY = "smarttroli_directions_pref";
 
 const QUICK_ITEMS = [
   "Mealie meal 5kg", "Bread", "Eggs 30s", "Chicken pieces",
@@ -139,6 +140,8 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
   const [voteOverrides, setVoteOverrides] = useState({}); // { [communityId]: { upvotes, downvotes, verified } }
   const [feedRefreshKey, setFeedRefreshKey] = useState(0);
   const [toast, setToast] = useState(null);
+  const [showAreaInput, setShowAreaInput] = useState(false);
+  const [areaInputValue, setAreaInputValue] = useState("");
 
   useEffect(() => {
     try {
@@ -312,6 +315,76 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
   function shareOnWhatsApp() {
     const text = buildWhatsAppShareText();
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+  }
+
+  // Whichever store has the lowest total on the store comparison card (same
+  // "best" store WhatsApp share uses), falling back to whichever store is
+  // individually cheapest for the most items if no single store covers the
+  // whole list.
+  function getCheapestStoreName() {
+    const fullComparison = computeStoreComparison(results || []);
+    const best = fullComparison.find((r) => r.isBest);
+    if (best) return best.store;
+
+    const counts = {};
+    for (const item of results || []) {
+      if (item.cheapest?.store) counts[item.cheapest.store] = (counts[item.cheapest.store] || 0) + 1;
+    }
+    const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+    return top?.[0] || null;
+  }
+
+  function openMapsUrl(url) {
+    // Note: the brief's regex was anchored (/^(iPhone|iPad|Android)/i), which
+    // never matches — real mobile user agents start with "Mozilla/5.0 (...",
+    // not the platform token. Unanchored so it actually detects mobile.
+    const isMobile = /(iPhone|iPad|Android)/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = url;
+    } else {
+      window.open(url, "_blank", "noopener,noreferrer");
+    }
+  }
+
+  function getDirections() {
+    const cheapestStore = getCheapestStoreName();
+    if (!cheapestStore) return;
+
+    let pref = null;
+    try { pref = JSON.parse(localStorage.getItem(DIRECTIONS_PREF_KEY) || "null"); } catch { /* ignore */ }
+
+    if (pref?.mode === "manual" && pref.area) {
+      setAreaInputValue(pref.area);
+      setShowAreaInput(true);
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setShowAreaInput(true);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        try { localStorage.setItem(DIRECTIONS_PREF_KEY, JSON.stringify({ mode: "auto" })); } catch { /* ignore */ }
+        const destination = encodeURIComponent(`${cheapestStore} Lusaka Zambia`).replace(/%20/g, "+");
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&origin=${pos.coords.latitude},${pos.coords.longitude}`;
+        openMapsUrl(url);
+      },
+      () => setShowAreaInput(true)
+    );
+  }
+
+  function submitManualArea() {
+    const area = areaInputValue.trim();
+    if (!area) return;
+    const cheapestStore = getCheapestStoreName();
+    if (!cheapestStore) return;
+
+    try { localStorage.setItem(DIRECTIONS_PREF_KEY, JSON.stringify({ mode: "manual", area })); } catch { /* ignore */ }
+    const query = encodeURIComponent(`${cheapestStore} ${area} Lusaka Zambia`).replace(/%20/g, "+");
+    openMapsUrl(`https://www.google.com/maps/search/${query}`);
+    setShowAreaInput(false);
   }
 
   async function shareListLink() {
@@ -981,7 +1054,8 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
               onMouseLeave={e => e.target.style.borderColor = "rgba(255,255,255,0.1)"}>
               ← New List
             </button>
-            <button style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg, #FF6B00, #FFD700)", border: "none", borderRadius: "12px", color: "#0D1B0F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
+            <button onClick={getDirections}
+              style={{ flex: 1, padding: "14px", background: "linear-gradient(135deg, #FF6B00, #FFD700)", border: "none", borderRadius: "12px", color: "#0D1B0F", fontSize: "15px", fontWeight: "700", cursor: "pointer" }}>
               🗺️ Get Directions
             </button>
             <button onClick={shareOnWhatsApp}
@@ -989,6 +1063,31 @@ export default function SmartTroliApp({ initialItems = [], autoRunSearch = false
               💬 Share
             </button>
           </div>
+
+          {showAreaInput && (
+            <div style={{ marginTop: "10px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <input
+                  value={areaInputValue}
+                  onChange={e => setAreaInputValue(e.target.value)}
+                  onKeyDown={e => e.key === "Enter" && submitManualArea()}
+                  placeholder="Enter your area (e.g. Manda Hill, Woodlands)"
+                  autoFocus
+                  style={{
+                    flex: 1, background: "rgba(255,255,255,0.06)", border: "1.5px solid rgba(255,255,255,0.1)",
+                    borderRadius: "10px", padding: "10px 12px", fontSize: "14px", color: "#F5F0E8", outline: "none",
+                  }}
+                />
+                <button onClick={submitManualArea}
+                  style={{
+                    background: "linear-gradient(135deg, #FF6B00, #FFD700)", border: "none", borderRadius: "10px",
+                    padding: "10px 18px", color: "#0D1B0F", fontSize: "14px", fontWeight: "700", cursor: "pointer",
+                  }}>
+                  Go
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
