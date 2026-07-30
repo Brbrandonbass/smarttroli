@@ -39,3 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# catalogue drag-and-drop inbox (scripts/catalogue-inbox.js) — dropped PDFs
+# are processed and moved into catalogues/zambia/, never committed from here
+catalogues/inbox/*.pdf
