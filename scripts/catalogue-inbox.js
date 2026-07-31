@@ -26,6 +26,7 @@
 // Run continuously:                                  node scripts/watch-inbox.js
 
 import Anthropic from "@anthropic-ai/sdk";
+import { PDFDocument } from "pdf-lib";
 import { execSync } from "child_process";
 import {
   readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync,
@@ -131,41 +132,16 @@ export function detectDatesFromFilename(filename) {
   );
 }
 
-// ── First-page rasterization + Claude vision fallback ───────────────────────
+// ── First-page rasterization + Claude fallback ──────────────────────────────
 
-function rasterizeFirstPage(pdfBuffer, dpi = 150) {
-  const id = randomUUID();
-  const pdfPath = join(tmpdir(), `inbox_${id}.pdf`);
-  const outPrefix = join(tmpdir(), `inbox_${id}_page`);
-  const outNamePrefix = `inbox_${id}_page`;
-  writeFileSync(pdfPath, pdfBuffer);
+const IDENTIFY_PROMPT = (labelSubject) => `This is ${labelSubject} of a Zambian grocery store catalogue PDF. Identify:
+1. Which store this is from — must be exactly one of: ${KNOWN_STORES.join(", ")} (use null if you can't tell)
+2. What are the valid from and until dates for this catalogue?
 
-  try {
-    execSync(`pdftoppm -jpeg -r ${dpi} -f 1 -l 1 "${pdfPath}" "${outPrefix}"`, { stdio: ["ignore", "pipe", "pipe"] });
-    const outFiles = readdirSync(tmpdir()).filter((f) => f.startsWith(outNamePrefix)).sort();
-    if (outFiles.length === 0) throw new Error("pdftoppm produced no output");
-    const jpeg = readFileSync(join(tmpdir(), outFiles[0]));
-    for (const f of outFiles) unlinkSync(join(tmpdir(), f));
-    return jpeg;
-  } finally {
-    try { unlinkSync(pdfPath); } catch { /* already removed */ }
-  }
-}
+Output ONLY this JSON: {"store": "Shoprite", "validFrom": "2026-07-20", "validUntil": "2026-08-09"}
+Use null for any field you can't determine confidently. Dates must be in YYYY-MM-DD format.`;
 
-async function identifyViaClaudeVision(pdfBuffer) {
-  if (!ANTHROPIC_API_KEY) {
-    console.log("  ⚠ ANTHROPIC_API_KEY not set — can't ask Claude to read the cover page");
-    return null;
-  }
-
-  let jpeg;
-  try {
-    jpeg = rasterizeFirstPage(pdfBuffer);
-  } catch (err) {
-    console.log(`  ⚠ Couldn't rasterize the first page (${err.message}) — is poppler-utils/pdftoppm installed?`);
-    return null;
-  }
-
+async function askClaudeToIdentify(documentBlock, labelSubject) {
   const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
   const response = await anthropic.messages.create({
     model: "claude-sonnet-4-6",
@@ -173,18 +149,7 @@ async function identifyViaClaudeVision(pdfBuffer) {
     system: "You identify Zambian grocery store catalogues from their cover page. Output ONLY valid JSON. Plain ASCII only.",
     messages: [{
       role: "user",
-      content: [
-        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpeg.toString("base64") } },
-        {
-          type: "text",
-          text: `This is the first page of a Zambian grocery store catalogue PDF. Identify:
-1. Which store this is from — must be exactly one of: ${KNOWN_STORES.join(", ")} (use null if you can't tell)
-2. What are the valid from and until dates for this catalogue?
-
-Output ONLY this JSON: {"store": "Shoprite", "validFrom": "2026-07-20", "validUntil": "2026-08-09"}
-Use null for any field you can't determine confidently. Dates must be in YYYY-MM-DD format.`,
-        },
-      ],
+      content: [documentBlock, { type: "text", text: IDENTIFY_PROMPT(labelSubject) }],
     }],
   });
 
@@ -201,6 +166,76 @@ Use null for any field you can't determine confidently. Dates must be in YYYY-MM
       validUntil: parsed.validUntil || null,
     };
   } catch {
+    return null;
+  }
+}
+
+// Rasterizes just the first page to a JPEG via poppler's pdftoppm. Passes
+// `env: process.env` explicitly — execSync's child process doesn't always
+// inherit a PATH that includes poppler otherwise (e.g. poppler installed via
+// a package manager that only updated an interactive shell's profile rather
+// than the system-wide PATH a plain `node script.js` invocation sees).
+function rasterizeFirstPage(pdfBuffer, dpi = 150) {
+  const id = randomUUID();
+  const pdfPath = join(tmpdir(), `inbox_${id}.pdf`);
+  const outPrefix = join(tmpdir(), `inbox_${id}_page`);
+  const outNamePrefix = `inbox_${id}_page`;
+  writeFileSync(pdfPath, pdfBuffer);
+
+  try {
+    execSync(`pdftoppm -jpeg -r ${dpi} -f 1 -l 1 "${pdfPath}" "${outPrefix}"`, {
+      stdio: ["ignore", "pipe", "pipe"],
+      env: process.env,
+    });
+    const outFiles = readdirSync(tmpdir()).filter((f) => f.startsWith(outNamePrefix)).sort();
+    if (outFiles.length === 0) throw new Error("pdftoppm produced no output");
+    const jpeg = readFileSync(join(tmpdir(), outFiles[0]));
+    for (const f of outFiles) unlinkSync(join(tmpdir(), f));
+    return jpeg;
+  } finally {
+    try { unlinkSync(pdfPath); } catch { /* already removed */ }
+  }
+}
+
+// Extracts just page 1 into its own tiny PDF via pdf-lib (pure JS, no system
+// binary) — used to keep the request small when falling back to sending
+// Claude the page as a PDF document block directly, since these catalogue
+// PDFs run 3-25MB and sending the whole thing risks the API's request size
+// limit for no benefit (only the cover page is needed).
+async function extractFirstPagePdf(pdfBuffer) {
+  const srcDoc = await PDFDocument.load(pdfBuffer, { ignoreEncryption: true });
+  const firstPageDoc = await PDFDocument.create();
+  const [copiedPage] = await firstPageDoc.copyPages(srcDoc, [0]);
+  firstPageDoc.addPage(copiedPage);
+  return Buffer.from(await firstPageDoc.save());
+}
+
+export async function identifyViaClaude(pdfBuffer) {
+  if (!ANTHROPIC_API_KEY) {
+    console.log("  ⚠ ANTHROPIC_API_KEY not set — can't ask Claude to read the cover page");
+    return null;
+  }
+
+  try {
+    const jpeg = rasterizeFirstPage(pdfBuffer);
+    return await askClaudeToIdentify(
+      { type: "image", source: { type: "base64", media_type: "image/jpeg", data: jpeg.toString("base64") } },
+      "the first page"
+    );
+  } catch (err) {
+    console.log(`  ⚠ Couldn't rasterize the first page (${err.message}) — is poppler-utils/pdftoppm installed? Falling back to sending the page as a PDF directly...`);
+  }
+
+  // poppler unavailable or failed — send the first page as a PDF document
+  // block instead, so this still works with zero system dependencies.
+  try {
+    const firstPagePdf = await extractFirstPagePdf(pdfBuffer);
+    return await askClaudeToIdentify(
+      { type: "document", source: { type: "base64", media_type: "application/pdf", data: firstPagePdf.toString("base64") } },
+      "the first page (a one-page PDF)"
+    );
+  } catch (err) {
+    console.log(`  ⚠ PDF-document fallback also failed: ${err.message}`);
     return null;
   }
 }
@@ -320,7 +355,7 @@ async function processOneFile(filename) {
 
   if (!store || !dates?.validFrom || !dates?.validUntil) {
     console.log("  🔍 Filename didn't have enough info — asking Claude to read the cover page...");
-    const viaClaude = await identifyViaClaudeVision(buffer).catch((err) => {
+    const viaClaude = await identifyViaClaude(buffer).catch((err) => {
       console.log(`  ⚠ Claude lookup failed: ${err.message}`);
       return null;
     });
