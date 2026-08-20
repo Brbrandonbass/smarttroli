@@ -1,3 +1,5 @@
+import NavBar from "./NavBar";
+
 export const sectionStyle = {
   background: "rgba(255,255,255,0.035)",
   border: "1px solid rgba(255,255,255,0.08)",
@@ -40,42 +42,7 @@ export default function GuideLayout({ title, subtitle, maxWidth = "680px", child
         fontFamily: "'Segoe UI', -apple-system, sans-serif",
       }}
     >
-      <nav
-        style={{
-          background: "rgba(13,27,15,0.85)",
-          backdropFilter: "blur(14px) saturate(1.4)",
-          borderBottom: "1px solid rgba(249,115,22,0.22)",
-          padding: "0 20px",
-          height: "64px",
-          display: "flex",
-          alignItems: "center",
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <a href="/" style={{ display: "flex", alignItems: "center", gap: "11px", textDecoration: "none" }}>
-          <div
-            style={{
-              width: "38px",
-              height: "38px",
-              background: "linear-gradient(135deg, #FF6B00, #F97316 55%, #FFD700)",
-              borderRadius: "11px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "19px",
-              boxShadow: "0 3px 12px rgba(249,115,22,0.4)",
-            }}
-          >
-            🛒
-          </div>
-          <div>
-            <span style={{ fontSize: "19px", fontWeight: 800, color: "#FFD700", letterSpacing: "-0.6px" }}>Smart</span>
-            <span style={{ fontSize: "19px", fontWeight: 800, color: "#FF6B00", letterSpacing: "-0.6px" }}>Troli</span>
-          </div>
-        </a>
-      </nav>
+      <NavBar />
 
       <div style={{ maxWidth, margin: "0 auto", padding: "32px 18px 60px" }}>
         <a

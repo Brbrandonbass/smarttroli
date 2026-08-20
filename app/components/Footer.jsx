@@ -17,7 +17,7 @@ export default function Footer() {
         © 2026 SmartTroli · Built for Zambia 🇿🇲
       </div>
       <div style={{ display: "flex", gap: "18px" }}>
-        <a href="/guides" className="footer-link" style={{ color: "rgba(245,240,232,0.6)", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
+        <a href="/guides" className="footer-link-accent" style={{ color: "#F97316", fontSize: "13px", fontWeight: 700, textDecoration: "none" }}>
           Guides
         </a>
         <a href="/privacy" className="footer-link" style={{ color: "rgba(245,240,232,0.6)", fontSize: "13px", fontWeight: 600, textDecoration: "none" }}>
@@ -28,6 +28,8 @@ export default function Footer() {
       <style>{`
         .footer-link { transition: color 0.15s ease; }
         .footer-link:hover { color: #F97316; }
+        .footer-link-accent { transition: color 0.15s ease; }
+        .footer-link-accent:hover { color: #FFD700; }
       `}</style>
     </footer>
   );
