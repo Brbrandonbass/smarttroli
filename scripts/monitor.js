@@ -1,13 +1,15 @@
 // scripts/monitor.js
 // Auto-fetches current catalogue PDFs for Pick n Pay, Shoprite, Choppies,
 // Game, and Spar (Zambia), saves any new one to catalogues/zambia/, and
-// commits + pushes it so the process-pdfs.yml workflow picks it up. Logs
-// every check to monitor_log.
+// commits + pushes it so the process-pdfs.yml workflow picks it up. Also
+// cleans up catalogues past their valid_until on every run — deleting their
+// catalogue_prices rows and source PDF, and marking them expired. Logs every
+// check (and every expiry cleanup) to monitor_log.
 
 import { neon } from "@neondatabase/serverless";
 import fetch from "node-fetch";
 import { execSync } from "child_process";
-import { writeFileSync, existsSync, mkdirSync } from "fs";
+import { writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -48,6 +50,67 @@ async function logMonitor(storeName, url, result, detail) {
     INSERT INTO monitor_log (store_name, url_checked, result, detail)
     VALUES (${storeName}, ${url}, ${result}, ${detail ?? ""})
   `;
+}
+
+// ── Expiry cleanup ───────────────────────────────────────────────────────────
+// Once a catalogue's valid_until has passed, its prices are stale and should
+// stop being served, and there's no reason to keep the source PDF around. Runs
+// every time this script does (the monitor.yml cron fires every 6 hours), so
+// the DB and catalogues/zambia/ stay clean without a manual pass.
+
+const CATALOGUE_SOURCE_PREFIX = "github://catalogues/zambia/";
+
+async function ensureExpiredColumn() {
+  await sql`ALTER TABLE catalogues ADD COLUMN IF NOT EXISTS expired BOOLEAN DEFAULT false`;
+}
+
+async function findExpiredCatalogues() {
+  return sql`
+    SELECT id, store_name, source_url, valid_until
+    FROM catalogues
+    WHERE valid_until < NOW()
+      AND processed = true
+      AND (expired IS NULL OR expired = false)
+  `;
+}
+
+// Only resolves a path for source_url values shaped like our own
+// catalogues/zambia/ filenames (github:// entries from process-pdfs.js /
+// fetch-catalogues.js) — anything else (ai-generated://, web-search://, or a
+// filename that isn't a flat basename) has no on-disk PDF to remove.
+function pdfPathForSourceUrl(sourceUrl) {
+  if (!sourceUrl || !sourceUrl.startsWith(CATALOGUE_SOURCE_PREFIX)) return null;
+  const filename = sourceUrl.slice(CATALOGUE_SOURCE_PREFIX.length);
+  if (!filename || filename.includes("/")) return null;
+  return join(PDF_DIR, filename);
+}
+
+async function cleanupExpiredCatalogues() {
+  console.log("\n🧹 Checking for expired catalogues...");
+  const expired = await findExpiredCatalogues();
+  if (expired.length === 0) {
+    console.log("  Nothing expired.");
+    return;
+  }
+
+  for (const cat of expired) {
+    const priceRows = await sql`DELETE FROM catalogue_prices WHERE catalogue_id = ${cat.id} RETURNING id`;
+
+    let pdfDeleted = false;
+    const pdfPath = pdfPathForSourceUrl(cat.source_url);
+    if (pdfPath && existsSync(pdfPath)) {
+      unlinkSync(pdfPath);
+      pdfDeleted = true;
+    }
+
+    await sql`UPDATE catalogues SET expired = true WHERE id = ${cat.id}`;
+
+    const detail =
+      `expired ${cat.valid_until} — deleted ${priceRows.length} price row(s)` +
+      (pdfDeleted ? `, removed PDF ${pdfPath}` : "");
+    await logMonitor(cat.store_name, cat.source_url ?? "", "expired_cleanup", detail);
+    console.log(`  🗑️  ${cat.store_name} catalogue #${cat.id}: ${detail}`);
+  }
 }
 
 // ── Date parsing ────────────────────────────────────────────────────────────
@@ -569,6 +632,9 @@ async function main() {
   console.log("SmartTroli — Catalogue Monitor");
   console.log("================================");
   console.log(`Started: ${new Date().toISOString()}`);
+
+  await ensureExpiredColumn();
+  await cleanupExpiredCatalogues();
 
   const results = [
     await checkChoppies(),
